@@ -1,6 +1,6 @@
 {
 	"appId": "com.mooja.autopost",
-	"appName": "MyDay\nv 1.2",
+	"appName": "MyDay\nv 1.3",
 	"webDir": "dist",
 	"server": {
 		"hostname": "localhost",

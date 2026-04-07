@@ -14,7 +14,7 @@ if [[ ! -f "$JS_FILE" || ! -f "$CAP_CONFIG" || ! -f "$STRINGS_XML" ]]; then
   exit 1
 fi
 
-CURRENT_VERSION="$(sed -n 's/.*"appName": "MyDay\\nv \([0-9]\+\.[0-9]\+\)".*/\1/p' "$CAP_CONFIG" | head -n 1)"
+CURRENT_VERSION="$(perl -ne 'if (/"appName":\s*"MyDay\\nv ([0-9]+\.[0-9]+)"/) { print "$1\n"; exit }' "$CAP_CONFIG")"
 
 if [[ -z "$CURRENT_VERSION" ]]; then
   echo "[ERROR] failed to detect current version" >&2

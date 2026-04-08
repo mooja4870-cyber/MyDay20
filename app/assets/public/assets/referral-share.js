@@ -104,6 +104,221 @@
   }
 
   /* ══════════════════════════════════════════
+     RAG FAQ (Intent Dataset + Retriever)
+     - 20 facts x 5 angles = 100 intents
+     - each intent has 5 questions + 5 answers
+     ══════════════════════════════════════════ */
+  const RAG_FACTS = [
+    { categoryId: "onboarding", categoryLabel: "온보딩/계정", factId: "first_setup", ask: "초기 설정 입력 항목", answer: "앱 첫 실행 시 네이버 아이디, 네이버 비밀번호, 블로그 아이디, Gemini API 키를 입력하고 저장하면 됩니다.", keywords: ["초기설정", "온보딩", "입력", "계정"] },
+    { categoryId: "onboarding", categoryLabel: "온보딩/계정", factId: "reopen_onboarding", ask: "온보딩 다시 보기", answer: "설정 화면에서 온보딩 다시 보기 또는 초기 설정 다시 하기를 선택하면 처음 단계부터 다시 진행할 수 있습니다.", keywords: ["온보딩", "다시", "초기설정"] },
+    { categoryId: "api", categoryLabel: "API 키", factId: "api_issue", ask: "Gemini API 키 발급", answer: "Google AI Studio(aistudio.google.com) 로그인 후 Get API key 또는 Create API key 메뉴에서 발급할 수 있습니다.", keywords: ["Gemini", "API", "키", "발급"] },
+    { categoryId: "api", categoryLabel: "API 키", factId: "api_limit", ask: "Gemini API 사용량 제한", answer: "Gemini API는 일일 사용량 제한이 있을 수 있어서 초과 시 잠시 기다린 뒤 다시 시도해야 합니다.", keywords: ["사용량", "제한", "초과", "재시도"] },
+    { categoryId: "photo", categoryLabel: "사진 업로드", factId: "photo_count", ask: "사진 업로드 개수 제한", answer: "사진은 최소 1장, 최대 10장까지 선택할 수 있습니다.", keywords: ["사진", "이미지", "최소", "최대", "10장"] },
+    { categoryId: "photo", categoryLabel: "사진 업로드", factId: "photo_type", ask: "업로드 가능한 파일 형식", answer: "이미지 파일만 업로드할 수 있으며 사진 선택 후에는 확인 버튼을 눌러야 다음 단계로 진행됩니다.", keywords: ["이미지", "파일", "형식", "확인버튼"] },
+    { categoryId: "place", categoryLabel: "장소 선택", factId: "place_multi", ask: "장소 복수 선택", answer: "장소는 복수 선택이 가능하며 상황에 맞는 분위기 반영에 사용됩니다.", keywords: ["장소", "복수선택", "분위기"] },
+    { categoryId: "place", categoryLabel: "장소 선택", factId: "place_other", ask: "기타 장소 직접 입력", answer: "목록에 없는 장소는 기타 직접 입력으로 자유롭게 추가할 수 있습니다.", keywords: ["기타", "직접입력", "장소"] },
+    { categoryId: "reason", categoryLabel: "이유 선택", factId: "reason_multi", ask: "이유 복수 선택", answer: "이유도 복수 선택이 가능하며 데이트, 산책, 공부 같은 목적을 함께 고를 수 있습니다.", keywords: ["이유", "복수선택", "목적"] },
+    { categoryId: "reason", categoryLabel: "이유 선택", factId: "reason_effect", ask: "이유 선택이 글에 미치는 영향", answer: "선택한 이유는 AI 글의 분위기와 표현 방향을 정할 때 반영됩니다.", keywords: ["분위기", "표현", "AI", "반영"] },
+    { categoryId: "person", categoryLabel: "인물 입력", factId: "person_optional", ask: "사진 속 인물 입력 필수 여부", answer: "사진 속 인물 입력은 선택 사항이라 사람이 없는 사진이면 비워도 됩니다.", keywords: ["인물", "선택사항", "비워도"] },
+    { categoryId: "person", categoryLabel: "인물 입력", factId: "person_example", ask: "인물 입력 예시", answer: "친구와 나, 가족들, 남자친구처럼 사진에 나온 사람을 자유롭게 적으면 됩니다.", keywords: ["예시", "친구", "가족", "자유입력"] },
+    { categoryId: "ai", categoryLabel: "AI 글 생성", factId: "ai_auto", ask: "AI 글 자동 생성 시작 시점", answer: "사진, 장소, 이유, 인물 단계 입력을 마치면 AI가 블로그 글 생성을 진행합니다.", keywords: ["AI", "자동생성", "4단계"] },
+    { categoryId: "ai", categoryLabel: "AI 글 생성", factId: "ai_regen_edit", ask: "글 재생성 및 본문 수정", answer: "포스팅 글 새로 생성하기로 다른 스타일을 받을 수 있고 포스팅 본문 화면에서 직접 수정도 가능합니다.", keywords: ["재생성", "스타일", "본문수정"] },
+    { categoryId: "posting", categoryLabel: "블로그 포스팅", factId: "post_run", ask: "네이버 블로그 자동 포스팅 실행", answer: "자동 포스팅 실행 버튼을 누르면 AI가 만든 글과 사진을 네이버 블로그로 업로드합니다.", keywords: ["자동포스팅", "실행", "업로드"] },
+    { categoryId: "posting", categoryLabel: "블로그 포스팅", factId: "post_result", ask: "포스팅 성공/실패 대응", answer: "성공 시 완료 안내 메시지가 뜨고 실패하면 다시 포스팅으로 빠르게 재시도할 수 있습니다.", keywords: ["성공", "실패", "재시도"] },
+    { categoryId: "error", categoryLabel: "오류 대응", factId: "safe_policy", ask: "안전 정책 차단 메시지", answer: "입력 내용이 안전 정책에 차단되면 표현을 완화해서 다시 시도하면 됩니다.", keywords: ["안전정책", "차단", "표현완화"] },
+    { categoryId: "error", categoryLabel: "오류 대응", factId: "network_issue", ask: "네트워크 관련 오류", answer: "AI 생성과 자동 포스팅은 인터넷 연결이 필수라 연결 상태를 확인한 뒤 재시도해야 합니다.", keywords: ["네트워크", "인터넷", "오류", "재시도"] },
+    { categoryId: "settings", categoryLabel: "설정 관리", factId: "settings_manage", ask: "계정 및 API 설정 변경", answer: "설정 화면의 계정 및 API 관리에서 네이버 계정, 블로그 아이디, Gemini API 키를 수정할 수 있습니다.", keywords: ["설정", "계정", "API", "변경"] },
+    { categoryId: "settings", categoryLabel: "설정 관리", factId: "settings_reset", ask: "초기 설정 다시 하기", answer: "초기 설정 다시 하기를 실행하면 온보딩 흐름으로 돌아가 입력값을 새로 저장할 수 있습니다.", keywords: ["초기설정", "리셋", "온보딩"] },
+  ];
+
+  const RAG_ANGLES = [
+    {
+      key: "guide",
+      questionTemplates: [
+        "{ASK} 알려주세요.",
+        "{ASK} 방법이 궁금해요.",
+        "{ASK} 어떻게 진행해요?",
+        "{CATEGORY}에서 {ASK} 기준이 뭐예요?",
+        "{ASK} 핵심만 짧게 알려주세요.",
+      ],
+      answerPhrases: ["안내 기준으로는", "기본 흐름은", "핵심만 요약하면", "가장 먼저 보면 좋은 건", "실행 기준은"],
+    },
+    {
+      key: "condition",
+      questionTemplates: [
+        "{ASK} 조건이 있나요?",
+        "{ASK} 제한이 있나요?",
+        "{ASK} 필수 항목이 뭔가요?",
+        "{ASK} 할 때 꼭 필요한 게 있어요?",
+        "{ASK} 전제 조건 알려주세요.",
+      ],
+      answerPhrases: ["조건을 기준으로 보면", "제한 관점에서 보면", "필수 조건은", "실무 기준으로는", "안정적으로 하려면"],
+    },
+    {
+      key: "retry",
+      questionTemplates: [
+        "{ASK} 안 되면 어떻게 해요?",
+        "{ASK} 실패했을 때 재시도 방법은?",
+        "{ASK} 오류가 나면 어떻게 복구해요?",
+        "{ASK} 문제 생겼을 때 순서 알려주세요.",
+        "{ASK} 막히면 어디부터 확인해요?",
+      ],
+      answerPhrases: ["문제 상황에서는", "재시도 기준으로는", "복구 순서로는", "오류 대응 기준은", "막혔을 때는"],
+    },
+    {
+      key: "quick",
+      questionTemplates: [
+        "{ASK} 빠르게 알려줘요.",
+        "{ASK} 한 줄로 설명해줘요.",
+        "{ASK} 바로 실행할 수 있게 알려주세요.",
+        "{ASK} 지금 당장 뭐 하면 돼요?",
+        "{ASK} 초보 기준으로 알려주세요.",
+      ],
+      answerPhrases: ["짧게 말하면", "한 줄 요약은", "바로 실행 기준은", "초보자 기준으로는", "지금 바로 하려면"],
+    },
+    {
+      key: "confirm",
+      questionTemplates: [
+        "{ASK} 맞게 이해했는지 확인하고 싶어요.",
+        "{ASK} 이 순서가 맞나요?",
+        "{ASK} 체크 포인트가 뭐예요?",
+        "{ASK} 놓치기 쉬운 부분이 있을까요?",
+        "{ASK} 마지막 확인사항 알려주세요.",
+      ],
+      answerPhrases: ["확인 포인트는", "체크 기준으로는", "놓치기 쉬운 점까지 포함하면", "최종 확인은", "마무리 기준으로는"],
+    },
+  ];
+
+  function normalizeText(text) {
+    return String(text || "")
+      .toLowerCase()
+      .replace(/[\u200b-\u200d\ufeff]/g, "")
+      .replace(/[^0-9a-z가-힣\s]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+  function tokenizeText(text) {
+    const norm = normalizeText(text);
+    if (!norm) return [];
+    return norm.split(" ").filter((t) => t.length > 0);
+  }
+  function makeBigrams(text) {
+    const compact = normalizeText(text).replace(/\s+/g, "");
+    const grams = new Set();
+    for (let i = 0; i < compact.length - 1; i += 1) {
+      grams.add(compact.slice(i, i + 2));
+    }
+    return grams;
+  }
+  function uniqueList(items) {
+    return Array.from(new Set(items.filter(Boolean)));
+  }
+  function hashText(text) {
+    let h = 0;
+    for (let i = 0; i < text.length; i += 1) {
+      h = ((h << 5) - h) + text.charCodeAt(i);
+      h |= 0;
+    }
+    return Math.abs(h);
+  }
+  function buildRagFaqDataset() {
+    const rows = [];
+    for (const fact of RAG_FACTS) {
+      for (const angle of RAG_ANGLES) {
+        const questions = angle.questionTemplates.map((tpl) => (
+          tpl
+            .split("{ASK}").join(fact.ask)
+            .split("{CATEGORY}").join(fact.categoryLabel)
+        ));
+        const answers = angle.answerPhrases.map((prefix) => `${prefix} ${fact.answer}`);
+        rows.push({
+          intent: `${fact.categoryId}_${fact.factId}_${angle.key}`,
+          categoryId: fact.categoryId,
+          categoryLabel: fact.categoryLabel,
+          ask: fact.ask,
+          keywords: uniqueList([...(fact.keywords || []), fact.categoryLabel, fact.ask, angle.key]),
+          questions,
+          answers,
+        });
+      }
+    }
+    return rows;
+  }
+  const RAG_FAQ_DATASET = buildRagFaqDataset();
+  const RAG_SEARCH_INDEX = RAG_FAQ_DATASET.map((intent) => {
+    const questionNorms = intent.questions.map((q) => normalizeText(q));
+    const allNorm = normalizeText([intent.ask, ...intent.questions, ...intent.keywords].join(" "));
+    const keywords = uniqueList(intent.keywords.map((k) => normalizeText(k)));
+    return {
+      intent,
+      questionNorms,
+      allNorm,
+      keywordSet: new Set(keywords),
+      bigrams: makeBigrams(allNorm),
+    };
+  });
+  const RAG_META = {
+    intentCount: RAG_FAQ_DATASET.length,
+    questionCount: RAG_FAQ_DATASET.length * 5,
+    answerCount: RAG_FAQ_DATASET.length * 5,
+  };
+
+  function isOutOfScopeQuery(query) {
+    const norm = normalizeText(query);
+    if (!norm) return false;
+    const outWords = ["날씨", "주식", "환율", "정치", "뉴스", "축구", "야구", "로또", "영화추천", "게임공략"];
+    return outWords.some((w) => norm.includes(w));
+  }
+  function findBestRagIntent(query) {
+    const qNorm = normalizeText(query);
+    if (!qNorm) return null;
+    const qTokens = tokenizeText(qNorm).filter((t) => t.length >= 2);
+    const qBigrams = makeBigrams(qNorm);
+    let best = null;
+    let second = null;
+
+    for (const row of RAG_SEARCH_INDEX) {
+      let score = 0;
+      if (row.questionNorms.includes(qNorm)) score += 120;
+      if (row.allNorm.includes(qNorm)) score += 40;
+
+      for (const tk of qTokens) {
+        if (row.keywordSet.has(tk)) score += 14;
+        else if (row.allNorm.includes(tk)) score += 4;
+      }
+
+      let gramHit = 0;
+      for (const g of qBigrams) {
+        if (row.bigrams.has(g)) gramHit += 1;
+      }
+      score += gramHit * 0.9;
+
+      if (!best || score > best.score) {
+        second = best;
+        best = { row, score };
+      } else if (!second || score > second.score) {
+        second = { row, score };
+      }
+    }
+
+    if (!best || best.score < 9) return null;
+    if (second && second.score > 0 && best.score < second.score * 1.08) {
+      return best.row.intent;
+    }
+    return best.row.intent;
+  }
+  function pickRagAnswer(intent, query) {
+    const idx = hashText(`${query}|${intent.intent}`) % intent.answers.length;
+    return intent.answers[idx];
+  }
+  function createRagFallback(query) {
+    if (isOutOfScopeQuery(query)) {
+      return "저는 MyDay 2.0 앱 사용 도우미예요. 앱 사용 관련 질문을 주시면 정확하게 안내해 드릴게요.";
+    }
+    return "아직 제가 잘 모르는 부분이에요. 설정 화면이나 공식 안내를 확인해 주세요~";
+  }
+
+  /* ══════════════════════════════════════════
      Publish State Observer
      — Watches DOM for success text to capture
        blog URL and timing info
@@ -551,25 +766,65 @@
     helpHeader.appendChild(helpCloseBtn);
     const helpBody = document.createElement("div");
     helpBody.className = "myday-share-modal-body";
+
+    const ragIntro = document.createElement("div");
+    ragIntro.className = "myday-rag-intro";
+    ragIntro.innerHTML = `
+      <div class="myday-rag-badge">RAG FAQ · ${RAG_META.intentCount} Intent · ${RAG_META.questionCount}Q</div>
+      <div class="myday-share-hint">질문 표현이 달라도 자동으로 가장 가까운 의도를 찾아 답해요.</div>`;
+
+    const ragQuick = document.createElement("div");
+    ragQuick.className = "myday-rag-quick";
+    const ragQuickQuestions = [
+      "Gemini API 키는 어디서 발급해요?",
+      "사진은 몇 장까지 올릴 수 있어요?",
+      "포스팅 실패하면 어떻게 해요?",
+      "온보딩 다시 보는 방법 알려줘요",
+    ];
+    const ragQuickButtons = ragQuickQuestions.map((q) => {
+      const btn = document.createElement("button");
+      btn.className = "myday-rag-quick-btn";
+      btn.textContent = q;
+      ragQuick.appendChild(btn);
+      return { btn, q };
+    });
+
+    const ragChat = document.createElement("div");
+    ragChat.className = "myday-rag-chat";
+
+    const ragInputWrap = document.createElement("div");
+    ragInputWrap.className = "myday-rag-input";
+    const ragInput = document.createElement("input");
+    ragInput.type = "text";
+    ragInput.placeholder = "앱 사용 질문을 입력해 주세요";
+    ragInput.maxLength = 220;
+    ragInput.enterKeyHint = "send";
+    const ragSendBtn = document.createElement("button");
+    ragSendBtn.textContent = "전송";
+    ragInputWrap.appendChild(ragInput);
+    ragInputWrap.appendChild(ragSendBtn);
+
     const helpActions = document.createElement("div");
     helpActions.className = "myday-share-actions";
-    const openChatbotBtn = document.createElement("button");
-    openChatbotBtn.className = "myday-share-btn primary";
-    openChatbotBtn.textContent = "🤖 마이 도우미 열기";
     const openBlogBtn = document.createElement("button");
     openBlogBtn.className = "myday-share-btn secondary";
     openBlogBtn.textContent = "🔗 내 블로그 열기";
     const copyReferralBtn = document.createElement("button");
     copyReferralBtn.className = "myday-share-btn secondary";
     copyReferralBtn.textContent = "📋 초대코드 복사";
-    const helpHint = document.createElement("div");
-    helpHint.className = "myday-share-hint";
-    helpHint.textContent = "앱 사용 중 자주 쓰는 기능을 바로 실행할 수 있어요.";
-    helpActions.appendChild(openChatbotBtn);
+
     helpActions.appendChild(openBlogBtn);
     helpActions.appendChild(copyReferralBtn);
+    const helpHint = document.createElement("div");
+    helpHint.className = "myday-share-hint";
+    helpHint.textContent = "앱과 무관한 질문은 답변하지 않아요.";
+    helpActions.appendChild(helpHint);
+
+    helpBody.appendChild(ragIntro);
+    helpBody.appendChild(ragQuick);
+    helpBody.appendChild(ragChat);
+    helpBody.appendChild(ragInputWrap);
     helpBody.appendChild(helpActions);
-    helpBody.appendChild(helpHint);
     helpModal.appendChild(helpHeader);
     helpModal.appendChild(helpBody);
     helpOverlay.appendChild(helpModal);
@@ -613,6 +868,8 @@
       } else if (pane === "help") {
         helpOverlay.classList.add("open");
         setActiveNav(helpBtn);
+        ensureRagWelcome();
+        setTimeout(() => { ragInput.focus(); }, 50);
       }
     }
     function renderCard() {
@@ -661,11 +918,55 @@
         });
       }
     }
-    function openChatbot() {
-      const fab = document.querySelector(".myday-chatbot-fab");
-      if (!fab) return false;
-      fab.click();
-      return true;
+    function scrollRagToBottom() {
+      requestAnimationFrame(() => {
+        ragChat.scrollTop = ragChat.scrollHeight;
+      });
+    }
+    function addRagMessage(role, text, meta) {
+      const row = document.createElement("div");
+      row.className = `myday-rag-row ${role}`;
+
+      const bubble = document.createElement("div");
+      bubble.className = "myday-rag-bubble";
+      bubble.textContent = text;
+      row.appendChild(bubble);
+
+      if (meta && role === "bot") {
+        const metaEl = document.createElement("div");
+        metaEl.className = "myday-rag-meta";
+        metaEl.textContent = meta;
+        row.appendChild(metaEl);
+      }
+      ragChat.appendChild(row);
+      scrollRagToBottom();
+    }
+    function ensureRagWelcome() {
+      if (ragChat.childElementCount > 0) return;
+      addRagMessage(
+        "bot",
+        "안녕하세요. 빠른도움 RAG 챗봇입니다. 앱 사용 질문을 입력하면 가장 가까운 의도로 답변해 드릴게요.",
+        `intent:${RAG_META.intentCount} · qa:${RAG_META.questionCount}`
+      );
+    }
+    function askRag(query) {
+      const q = String(query || "").trim();
+      if (!q) return;
+      addRagMessage("user", q);
+
+      const intent = findBestRagIntent(q);
+      if (!intent) {
+        addRagMessage("bot", createRagFallback(q), "fallback");
+        return;
+      }
+      const answer = pickRagAnswer(intent, q);
+      addRagMessage("bot", answer, `${intent.categoryLabel} · ${intent.intent}`);
+    }
+    function submitRagQuery() {
+      const q = ragInput.value.trim();
+      if (!q) return;
+      ragInput.value = "";
+      askRag(q);
     }
 
     shareBtn.addEventListener("click", () => togglePane("share"));
@@ -704,12 +1005,15 @@
       saveHistory([]);
       renderHistory();
     });
-    openChatbotBtn.addEventListener("click", () => {
-      closeAll();
-      if (!openChatbot()) {
-        alert("도우미 준비 중입니다. 잠시 후 다시 시도해 주세요.");
-      }
+    ragSendBtn.addEventListener("click", submitRagQuery);
+    ragInput.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter") return;
+      e.preventDefault();
+      submitRagQuery();
     });
+    for (const item of ragQuickButtons) {
+      item.btn.addEventListener("click", () => askRag(item.q));
+    }
     openBlogBtn.addEventListener("click", () => {
       const blogId = getBlogId();
       if (!blogId) {

@@ -1,17 +1,17 @@
 # PROJECT_STATUS
 
-- Last Updated: 2026-04-08 23:28:09
+- Last Updated: 2026-04-08 23:42:12
 - Policy: 작업 시작 전 이 파일을 먼저 확인하고, 없으면 생성 후 유지
 - Harness Mode: ENABLED
 - Deploy Rule: 코드 수정 후 `빌드 -> 푸시 -> 설치 -> 실행` 필수
 - Status Rule: 코드 변경/기능 추가/수정/삭제 후 반드시 이 파일 갱신 (필수)
 
 ## Current Target
-- App Label: `MyDay\n2.3`
+- App Label: `MyDay\n2.4`
 - App Id: `com.mooja.myday20`
 - Android Package: `com.mooja.myday20`
 - Launch Component: `com.mooja.myday20/com.mooja.autopost.MainActivity`
-- Current Version: 2.3
+- Current Version: 2.4
 
 ## Structure
 - `app/` : Android(smali/apktool) project
@@ -26,6 +26,7 @@
 | 2026-04-08 | 2.2 | 하네스 스크립트 수정 (chatbot 파일 포함, 버전 감지 regex 수정) |
 | 2026-04-09 | 2.3 | 리퍼럴+공유카드 시스템 추가 (referral-share.js, bottom-nav.css) — 하단 고정메뉴 1/3 |
 | 2026-04-08 | 2.3 | 하단 고정메뉴 2/3·3/3 완료 (포스팅 기록, 빠른도움) + 공유/복사/성공감지 안정화 |
+| 2026-04-08 | 2.4 | 기존 챗봇 아이콘/로딩 제거 후 빠른도움 내 RAG FAQ 챗봇(100 Intent, 500 Q/A)으로 교체 |
 
 ## Next Rule
 - 코드 수정 후 이 파일의 `Last Updated`와 `Change Log`를 갱신

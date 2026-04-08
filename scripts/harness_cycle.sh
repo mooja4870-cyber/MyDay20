@@ -26,7 +26,7 @@ echo "[3/6] Sign"
 "$BUILD_TOOLS_DIR/apksigner" verify "$SIGNED_APK"
 
 echo "[4/6] Push"
-git add   "$SMALI_PROJECT/AndroidManifest.xml"   "$SMALI_PROJECT/apktool.yml"   "$SMALI_PROJECT/assets/public/index.html"   "$SMALI_PROJECT/assets/public/assets/index-*.js"   "$SMALI_PROJECT/assets/public/assets/chatbot.js"   "$SMALI_PROJECT/assets/public/assets/chatbot.css"   "$SMALI_PROJECT/assets/public/assets/knowledge.md"   "$SMALI_PROJECT/assets/capacitor.config.json"   "$SMALI_PROJECT/res/values/strings.xml"   PROJECT_STATUS.md
+git add   "$SMALI_PROJECT/AndroidManifest.xml"   "$SMALI_PROJECT/apktool.yml"   "$SMALI_PROJECT/assets/public/index.html"   "$SMALI_PROJECT/assets/public/assets/index-*.js"   "$SMALI_PROJECT/assets/public/assets/chatbot.js"   "$SMALI_PROJECT/assets/public/assets/chatbot.css"   "$SMALI_PROJECT/assets/public/assets/knowledge.md"   "$SMALI_PROJECT/assets/public/assets/referral-share.js"   "$SMALI_PROJECT/assets/public/assets/bottom-nav.css"   "$SMALI_PROJECT/assets/capacitor.config.json"   "$SMALI_PROJECT/res/values/strings.xml"   PROJECT_STATUS.md   scripts/harness_cycle.sh
 git commit -m "chore: bump MyDay 2.0 version to $NEXT_VERSION" || true
 git push origin main
 

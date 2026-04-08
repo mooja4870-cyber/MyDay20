@@ -1,0 +1,10 @@
+{
+  "appId": "com.mooja.myday20",
+  "appName": "MyDay\\n2.0",
+  "webDir": "dist",
+  "server": {
+    "hostname": "localhost",
+    "androidScheme": "http",
+    "cleartext": true
+  }
+}

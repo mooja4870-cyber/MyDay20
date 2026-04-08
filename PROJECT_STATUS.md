@@ -1,6 +1,6 @@
 # PROJECT_STATUS
 
-- Last Updated: 2026-04-08 11:51:59
+- Last Updated: 2026-04-08 11:59:30
 - Policy: 작업 시작 전 이 파일을 먼저 확인하고, 없으면 생성 후 유지
 - Harness Mode: ENABLED
 - Deploy Rule: 코드 수정 후 `빌드 -> 푸시 -> 설치 -> 실행` 필수
@@ -26,5 +26,8 @@
 - 조치:
   - backend `server.ts`에서 `/api/publish`, `/api/publish-async`에 요청 계정 강제 검증 추가
   - backend `naverPublisher.ts`에서 요청 계정(credentials) 우선 사용하도록 수정
+  - 요청 변경: `요청 계정 우선` -> `요청 계정 only`로 강화 (fallback 완전 제거)
+  - `/api/publish-sample`도 요청 계정 없으면 `INVALID_CREDENTIALS`로 차단
   - Railway 배포: `01bb931f-f9f6-4652-8f0f-ccef757ffb53` (SUCCESS)
   - 실서버 검증: credentials 없는 발행 요청이 `INVALID_CREDENTIALS` 400으로 차단됨
+  - 추가 Railway 배포: `e7c5c805-bab6-448a-8070-0f953a4bf5ed` (SUCCESS)

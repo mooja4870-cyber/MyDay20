@@ -14,7 +14,7 @@ if [[ ! -f "$JS_FILE" || ! -f "$CAP_CONFIG" || ! -f "$STRINGS_XML" ]]; then
   exit 1
 fi
 
-CURRENT_VERSION="$(perl -ne 'if (/"appName":\s*"MyDay\n([0-9]+\.[0-9]+)"/) { print "$1\n"; exit }' "$CAP_CONFIG")"
+CURRENT_VERSION="$(perl -ne 'if (/"appName":\s*"MyDay\\\\n([0-9]+\.[0-9]+)"/) { print "$1\n"; exit }' "$CAP_CONFIG")"
 
 if [[ -z "$CURRENT_VERSION" ]]; then
   echo "[ERROR] failed to detect current version" >&2
@@ -34,7 +34,7 @@ fi
 NEXT_VERSION="${major}.${minor}"
 
 NEXT_VERSION="$NEXT_VERSION" perl -0pi -e 's/(Ix="v )([0-9]+\.[0-9]+)(")/$1$ENV{NEXT_VERSION}$3/g' "$JS_FILE"
-NEXT_VERSION="$NEXT_VERSION" perl -0pi -e 's/("appName": "MyDay\n)([0-9]+\.[0-9]+)(")/$1$ENV{NEXT_VERSION}$3/g' "$CAP_CONFIG"
+NEXT_VERSION="$NEXT_VERSION" perl -0pi -e 's/("appName": "MyDay\\\\n)([0-9]+\.[0-9]+)(")/$1$ENV{NEXT_VERSION}$3/g' "$CAP_CONFIG"
 NEXT_VERSION="$NEXT_VERSION" perl -0pi -e 's/(<string name="app_name">"MyDay\s*)(?:v\s*)?([0-9]+\.[0-9]+)("<\/string>)/$1$ENV{NEXT_VERSION}$3/s; s/(<string name="title_activity_main">"MyDay\s*)(?:v\s*)?([0-9]+\.[0-9]+)("<\/string>)/$1$ENV{NEXT_VERSION}$3/s;' "$STRINGS_XML"
 
 echo "$NEXT_VERSION"

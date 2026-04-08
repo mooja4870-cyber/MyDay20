@@ -1,6 +1,6 @@
 {
   "appId": "com.mooja.myday20",
-  "appName": "MyDay\\n2.3",
+  "appName": "MyDay\\n2.4",
   "webDir": "dist",
   "server": {
     "hostname": "localhost",

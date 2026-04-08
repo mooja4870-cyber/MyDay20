@@ -1,0 +1,10 @@
+{
+	"appId": "com.mooja.autopost",
+	"appName": "MyDay\nv 1.8",
+	"webDir": "dist",
+	"server": {
+		"hostname": "localhost",
+		"androidScheme": "http",
+		"cleartext": true
+	}
+}

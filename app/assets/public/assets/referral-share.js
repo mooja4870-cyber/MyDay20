@@ -319,6 +319,158 @@
   }
 
   /* ══════════════════════════════════════════
+     Latest Blog Content Capture
+     ══════════════════════════════════════════ */
+  let lastGeneratedBlogDoc = null;
+  let blogCaptureHookInstalled = false;
+
+  function parseHashtags(text) {
+    const tags = String(text || "").match(/#[^\s#]+/g) || [];
+    return uniqueList(tags.map((t) => t.trim()));
+  }
+  function parseBlogDocument(rawText, fallbackTitle) {
+    const normalized = String(rawText || "")
+      .replace(/\r\n/g, "\n")
+      .replace(/\r/g, "\n")
+      .trim();
+    if (!normalized) return null;
+
+    const lines = normalized.split("\n").map((line) => line.trimEnd());
+    let title = "";
+    let titleIndex = -1;
+    for (let i = 0; i < lines.length; i += 1) {
+      const ln = (lines[i] || "").trim();
+      if (!ln) continue;
+      title = ln.replace(/^#+\s*/, "");
+      titleIndex = i;
+      break;
+    }
+    if (!title && fallbackTitle) title = fallbackTitle;
+    if (!title) title = "MyDay 포스팅";
+
+    const bodySource = lines.slice(titleIndex + 1).join("\n").trim();
+    const bodyText = bodySource || normalized;
+    const hashtags = parseHashtags(normalized);
+
+    return {
+      title,
+      bodyText,
+      hashtags,
+      fullText: normalized,
+      capturedAt: new Date().toISOString(),
+    };
+  }
+  function captureBlogFromPayload(url, responseText) {
+    if (!/\/api\/generate-blog/i.test(String(url || ""))) return;
+    let parsed;
+    try {
+      parsed = JSON.parse(responseText);
+    } catch { return; }
+
+    const post =
+      (typeof parsed?.post === "string" && parsed.post) ||
+      (typeof parsed?.data?.post === "string" && parsed.data.post) ||
+      "";
+    if (!post || !post.trim()) return;
+
+    const doc = parseBlogDocument(post, findPostTitleFromDom());
+    if (!doc) return;
+    lastGeneratedBlogDoc = { ...doc, source: "api" };
+  }
+  function installBlogCaptureHooks() {
+    if (blogCaptureHookInstalled) return;
+    blogCaptureHookInstalled = true;
+
+    if (typeof XMLHttpRequest !== "undefined") {
+      const originalOpen = XMLHttpRequest.prototype.open;
+      const originalSend = XMLHttpRequest.prototype.send;
+
+      XMLHttpRequest.prototype.open = function (...args) {
+        this.__mydayUrl = typeof args[1] === "string" ? args[1] : "";
+        return originalOpen.apply(this, args);
+      };
+      XMLHttpRequest.prototype.send = function (...args) {
+        this.addEventListener("load", () => {
+          try {
+            captureBlogFromPayload(this.__mydayUrl || "", this.responseText || "");
+          } catch {}
+        });
+        return originalSend.apply(this, args);
+      };
+    }
+
+    if (typeof window.fetch === "function") {
+      const originalFetch = window.fetch.bind(window);
+      window.fetch = async (...args) => {
+        const res = await originalFetch(...args);
+        try {
+          const url =
+            (typeof args[0] === "string" && args[0]) ||
+            (args[0] && typeof args[0].url === "string" && args[0].url) ||
+            "";
+          if (/\/api\/generate-blog/i.test(url)) {
+            res.clone().text().then((txt) => {
+              captureBlogFromPayload(url, txt);
+            }).catch(() => {});
+          }
+        } catch {}
+        return res;
+      };
+    }
+  }
+  function extractBlogFromDom(fallbackTitle) {
+    const candidates = [];
+    function pushCandidate(text, scoreBase) {
+      const t = String(text || "").trim();
+      if (t.length < 80) return;
+      const score =
+        scoreBase +
+        (t.includes("#") ? 45 : 0) +
+        (t.includes("\n") ? 30 : 0) +
+        Math.min(t.length / 20, 120);
+      candidates.push({ text: t, score });
+    }
+
+    const textareas = document.querySelectorAll("textarea");
+    for (const ta of textareas) {
+      pushCandidate(ta.value, 120);
+    }
+
+    const editables = document.querySelectorAll("[contenteditable='true']");
+    for (const el of editables) {
+      pushCandidate(el.innerText || el.textContent || "", 90);
+    }
+
+    const likelyBlocks = document.querySelectorAll("article, section, pre, div[class*='post'], div[class*='content'], div[class*='body']");
+    for (const el of likelyBlocks) {
+      pushCandidate(el.innerText || el.textContent || "", 50);
+    }
+
+    if (!candidates.length) return null;
+    candidates.sort((a, b) => b.score - a.score);
+    const best = candidates[0];
+    const doc = parseBlogDocument(best.text, fallbackTitle);
+    if (!doc) return null;
+    return { ...doc, source: "dom" };
+  }
+  function getLatestBlogDocument(fallbackTitle) {
+    const domDoc = extractBlogFromDom(fallbackTitle);
+    if (domDoc) {
+      lastGeneratedBlogDoc = domDoc;
+      return domDoc;
+    }
+    if (lastGeneratedBlogDoc) return lastGeneratedBlogDoc;
+    return {
+      title: fallbackTitle || "MyDay 포스팅",
+      bodyText: "직전에 생성된 블로그 본문을 아직 찾지 못했어요.\n포스팅 글을 생성한 뒤 다시 눌러 주세요.",
+      hashtags: [],
+      fullText: "",
+      capturedAt: new Date().toISOString(),
+      source: "fallback",
+    };
+  }
+
+  /* ══════════════════════════════════════════
      Publish State Observer
      — Watches DOM for success text to capture
        blog URL and timing info
@@ -350,6 +502,10 @@
         const imgEls = document.querySelectorAll('img[src^="data:image"]');
         const imgCount = imgEls.length;
         const title = findPostTitleFromDom();
+        const domDoc = extractBlogFromDom(title);
+        if (domDoc) {
+          lastGeneratedBlogDoc = domDoc;
+        }
 
         /* Get first image for card */
         let heroImgSrc = "";
@@ -620,6 +776,160 @@
       return true;
     } catch { return false; }
   }
+  function wrapCanvasLine(ctx, text, maxW) {
+    const chars = Array.from(String(text || ""));
+    const lines = [];
+    let line = "";
+    for (const ch of chars) {
+      const test = line + ch;
+      if (line && ctx.measureText(test).width > maxW) {
+        lines.push(line);
+        line = ch;
+      } else {
+        line = test;
+      }
+    }
+    if (line) lines.push(line);
+    return lines.length ? lines : [""];
+  }
+  function buildWrappedBodyLines(ctx, bodyText, maxW) {
+    const paragraphs = String(bodyText || "").replace(/\r\n/g, "\n").split("\n");
+    const lines = [];
+    paragraphs.forEach((paragraph, idx) => {
+      const p = paragraph.trim();
+      if (!p) {
+        lines.push("");
+        return;
+      }
+      const wrapped = wrapCanvasLine(ctx, p, maxW);
+      wrapped.forEach((line) => lines.push(line));
+      if (idx < paragraphs.length - 1) {
+        lines.push("");
+      }
+    });
+    return lines;
+  }
+  function drawBlogSnapshotImage(canvas, doc) {
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const WIDTH = 1080;
+    const PAD_X = 84;
+    const TITLE_LINE_H = 70;
+    const BODY_LINE_H = 48;
+    const BODY_EMPTY_H = 20;
+    const CONTENT_W = WIDTH - PAD_X * 2;
+    const titleText = doc.title || "MyDay 포스팅";
+    const bodyText = doc.bodyText || doc.fullText || "";
+    const hashtagsLine = (doc.hashtags && doc.hashtags.length) ? doc.hashtags.join(" ") : "";
+
+    ctx.font = '900 56px "Noto Sans KR", sans-serif';
+    const titleLines = wrapCanvasLine(ctx, titleText, CONTENT_W);
+
+    ctx.font = '500 34px "Noto Sans KR", sans-serif';
+    const bodyLines = buildWrappedBodyLines(ctx, bodyText, CONTENT_W);
+
+    ctx.font = '700 30px "Noto Sans KR", sans-serif';
+    const tagLines = hashtagsLine ? wrapCanvasLine(ctx, hashtagsLine, CONTENT_W) : [];
+
+    let dynamicHeight = 150;
+    dynamicHeight += titleLines.length * TITLE_LINE_H;
+    dynamicHeight += 34;
+    for (const line of bodyLines) {
+      dynamicHeight += line ? BODY_LINE_H : BODY_EMPTY_H;
+    }
+    dynamicHeight += 24;
+    dynamicHeight += tagLines.length * 44;
+    dynamicHeight += 140;
+
+    const HEIGHT = Math.max(1400, dynamicHeight);
+    canvas.width = WIDTH;
+    canvas.height = HEIGHT;
+
+    const bg = ctx.createLinearGradient(0, 0, 0, HEIGHT);
+    bg.addColorStop(0, "#fff4fa");
+    bg.addColorStop(0.52, "#fff9fd");
+    bg.addColorStop(1, "#ffffff");
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+    ctx.fillStyle = "rgba(255,255,255,0.92)";
+    ctx.beginPath();
+    roundRect(ctx, 34, 34, WIDTH - 68, HEIGHT - 68, 30);
+    ctx.fill();
+    ctx.strokeStyle = "#ffd9e9";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    roundRect(ctx, 34, 34, WIDTH - 68, HEIGHT - 68, 30);
+    ctx.stroke();
+
+    let y = 96;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "alphabetic";
+
+    ctx.fillStyle = "#c44978";
+    ctx.font = '800 28px "Noto Sans KR", sans-serif';
+    ctx.fillText("MyDay 블로그 스냅샷", PAD_X, y);
+    y += 28;
+
+    ctx.strokeStyle = "#ffd2e5";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(PAD_X, y + 16);
+    ctx.lineTo(WIDTH - PAD_X, y + 16);
+    ctx.stroke();
+    y += 64;
+
+    ctx.fillStyle = "#7b2f54";
+    ctx.font = '900 56px "Noto Sans KR", sans-serif';
+    titleLines.forEach((line) => {
+      ctx.fillText(line, PAD_X, y);
+      y += TITLE_LINE_H;
+    });
+    y += 14;
+
+    ctx.fillStyle = "#5e3a4a";
+    ctx.font = '500 34px "Noto Sans KR", sans-serif';
+    bodyLines.forEach((line) => {
+      if (!line) {
+        y += BODY_EMPTY_H;
+        return;
+      }
+      ctx.fillText(line, PAD_X, y);
+      y += BODY_LINE_H;
+    });
+
+    if (tagLines.length > 0) {
+      y += 16;
+      ctx.fillStyle = "#c14978";
+      ctx.font = '700 30px "Noto Sans KR", sans-serif';
+      tagLines.forEach((line) => {
+        ctx.fillText(line, PAD_X, y);
+        y += 44;
+      });
+    }
+
+    const footer = formatDateTime(doc.capturedAt || new Date().toISOString());
+    ctx.fillStyle = "#c386a2";
+    ctx.font = '600 24px "Noto Sans KR", sans-serif';
+    ctx.fillText(`생성시각 ${footer || "-"}`, PAD_X, HEIGHT - 54);
+  }
+  async function copyCanvasImage(canvas) {
+    try {
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+      if (!blob) return false;
+      if (!navigator.clipboard || !window.isSecureContext || typeof ClipboardItem === "undefined") {
+        return false;
+      }
+      if (typeof ClipboardItem.supports === "function" && !ClipboardItem.supports(blob.type)) {
+        return false;
+      }
+      await navigator.clipboard.write([
+        new ClipboardItem({ [blob.type]: blob }),
+      ]);
+      return true;
+    } catch { return false; }
+  }
 
   /* ══════════════════════════════════════════
      Build UI
@@ -667,59 +977,27 @@
     const previewWrap = document.createElement("div");
     previewWrap.className = "myday-share-card-preview";
     const cardCanvas = document.createElement("canvas");
+    cardCanvas.className = "myday-share-long-canvas";
     previewWrap.appendChild(cardCanvas);
-    const refBox = document.createElement("div");
-    refBox.className = "myday-referral-box";
-    refBox.innerHTML = `
-      <div class="label">내 초대코드</div>
-      <div class="myday-referral-code">
-        <span id="myday-ref-code">${ref.code}</span>
-        <button class="myday-referral-copy" id="myday-copy-btn">복사</button>
-      </div>`;
-    const stats = document.createElement("div");
-    stats.className = "myday-referral-stats";
-    stats.innerHTML = `
-      <div class="myday-referral-stat">
-        <div class="num" id="myday-invite-count">${ref.inviteCount || 0}</div>
-        <div class="desc">초대한 친구</div>
-      </div>
-      <div class="myday-referral-stat">
-        <div class="num" id="myday-credit-count">${ref.rewardCredits || 0}</div>
-        <div class="desc">적립 크레딧</div>
-      </div>`;
-    const milestone = document.createElement("div");
-    milestone.className = "myday-milestone";
-    const inviteCount = ref.inviteCount || 0;
-    const pct = Math.min(inviteCount / 10 * 100, 100);
-    milestone.innerHTML = `
-      <div class="title">🏆 초대 마일스톤</div>
-      <div class="myday-milestone-bar">
-        <div class="myday-milestone-bar-fill" style="width:${pct}%"></div>
-      </div>
-      <div class="myday-milestone-labels">
-        <span class="${inviteCount >= 3 ? "reached" : ""}">3명 → 프리미엄 7일</span>
-        <span class="${inviteCount >= 5 ? "reached" : ""}">5명 → 스타일팩</span>
-        <span class="${inviteCount >= 10 ? "reached" : ""}">10명 → PRO 배지</span>
-      </div>`;
+    const shareGuide = document.createElement("div");
+    shareGuide.className = "myday-share-copy-guide";
+    shareGuide.textContent = "지금 이미지가 생성되었습니다. 버튼을 누르면 이미지가 복사됩니다. 원하는 곳에 가서 붙여넣기 하면 인스타, SNS 등 다양하게 활용할 수 있습니다.";
     const actions = document.createElement("div");
     actions.className = "myday-share-actions";
-    const sharePrimary = document.createElement("button");
-    sharePrimary.className = "myday-share-btn primary";
-    sharePrimary.innerHTML = "📤 공유카드 보내기";
-    const downloadBtn = document.createElement("button");
-    downloadBtn.className = "myday-share-btn secondary";
-    downloadBtn.innerHTML = "💾 이미지 저장";
-    const shareHint = document.createElement("div");
-    shareHint.className = "myday-share-hint";
-    shareHint.textContent = "포스팅 완료 후 열면 최신 결과가 자동 반영됩니다.";
-    actions.appendChild(sharePrimary);
-    actions.appendChild(downloadBtn);
+    const copyImageBtn = document.createElement("button");
+    copyImageBtn.className = "myday-share-btn primary";
+    copyImageBtn.textContent = "🖼️ 이미지 복사";
+    const refreshImageBtn = document.createElement("button");
+    refreshImageBtn.className = "myday-share-btn secondary";
+    refreshImageBtn.textContent = "🔄 이미지 다시 생성";
+    const shareStatus = document.createElement("div");
+    shareStatus.className = "myday-share-copy-status";
+    actions.appendChild(copyImageBtn);
+    actions.appendChild(refreshImageBtn);
     body.appendChild(previewWrap);
-    body.appendChild(refBox);
-    body.appendChild(stats);
-    body.appendChild(milestone);
+    body.appendChild(shareGuide);
     body.appendChild(actions);
-    body.appendChild(shareHint);
+    body.appendChild(shareStatus);
     modal.appendChild(header);
     modal.appendChild(body);
     overlay.appendChild(modal);
@@ -860,7 +1138,7 @@
       if (pane === "share") {
         overlay.classList.add("open");
         setActiveNav(shareBtn);
-        renderCard();
+        renderShareImage();
       } else if (pane === "history") {
         historyOverlay.classList.add("open");
         setActiveNav(historyBtn);
@@ -872,17 +1150,24 @@
         setTimeout(() => { ragInput.focus(); }, 50);
       }
     }
-    function renderCard() {
-      const data = lastPublishData || {
-        title: "MyDay 포스팅",
-        blogUrl: getBlogId() ? `https://blog.naver.com/${getBlogId()}` : "",
-        elapsed: 0,
-        imgCount: 0,
-        heroImgSrc: "",
-      };
-      generateShareCard(cardCanvas, data, ref.code);
-      if (data.heroImgSrc) {
-        drawHeroImage(cardCanvas, data.heroImgSrc);
+    function setShareStatus(message, tone) {
+      shareStatus.className = "myday-share-copy-status";
+      if (tone === "ok") shareStatus.classList.add("ok");
+      if (tone === "fail") shareStatus.classList.add("fail");
+      shareStatus.textContent = message;
+    }
+    function renderShareImage() {
+      const fallbackTitle = (lastPublishData && lastPublishData.title) || "MyDay 포스팅";
+      const doc = getLatestBlogDocument(fallbackTitle);
+      drawBlogSnapshotImage(cardCanvas, doc);
+      setShareStatus("지금 이미지가 나타났습니다. 이미지 또는 버튼을 눌러 복사해 주세요.", "");
+    }
+    async function copyShareImage() {
+      const ok = await copyCanvasImage(cardCanvas);
+      if (ok) {
+        setShareStatus("복사 완료! 원하는 곳에 붙여넣기해서 인스타, SNS 등에 활용해 보세요.", "ok");
+      } else {
+        setShareStatus("이 환경에서는 이미지 복사가 지원되지 않습니다. 다시 생성 후 저장해서 사용해 주세요.", "fail");
       }
     }
     function renderHistory() {
@@ -985,22 +1270,9 @@
       if (e.target === helpOverlay) closeAll();
     });
 
-    sharePrimary.addEventListener("click", async () => {
-      const shared = await shareViaWebAPI(cardCanvas, ref.code);
-      if (!shared) downloadCard(cardCanvas);
-    });
-    downloadBtn.addEventListener("click", () => downloadCard(cardCanvas));
-    document.getElementById("myday-copy-btn").addEventListener("click", async () => {
-      const ok = await copyCode(ref.code);
-      const btn = document.getElementById("myday-copy-btn");
-      if (ok) {
-        btn.textContent = "복사됨!";
-        setTimeout(() => { btn.textContent = "복사"; }, 1500);
-      } else {
-        btn.textContent = "실패";
-        setTimeout(() => { btn.textContent = "복사"; }, 1200);
-      }
-    });
+    copyImageBtn.addEventListener("click", copyShareImage);
+    refreshImageBtn.addEventListener("click", renderShareImage);
+    cardCanvas.addEventListener("click", copyShareImage);
     clearHistoryBtn.addEventListener("click", () => {
       saveHistory([]);
       renderHistory();
@@ -1040,6 +1312,7 @@
      Init
      ══════════════════════════════════════════ */
   function init() {
+    installBlogCaptureHooks();
     createUI();
     startPublishObserver();
   }

@@ -133,6 +133,33 @@
   height: auto;
   display: block;
 }
+.myday-share-long-canvas {
+  cursor: copy;
+}
+.myday-share-copy-guide {
+  background: #fff5fa;
+  border: 1px solid #ffd8e8;
+  border-radius: 12px;
+  padding: 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #9f3d68;
+  font-weight: 700;
+}
+.myday-share-copy-status {
+  min-height: 20px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #b56c8f;
+  font-weight: 700;
+  text-align: center;
+}
+.myday-share-copy-status.ok {
+  color: #2e995c;
+}
+.myday-share-copy-status.fail {
+  color: #cd3f64;
+}
 
 /* Referral Section */
 .myday-referral-box {

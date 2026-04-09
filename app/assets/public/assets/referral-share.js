@@ -360,6 +360,90 @@
       capturedAt: new Date().toISOString(),
     };
   }
+  function stripSectionMarker(text) {
+    return String(text || "")
+      .replace(/^■\s*/, "")
+      .replace(/\s*■$/, "")
+      .trim();
+  }
+  function parseQuotePair(quoteText, quoteAuthor, quoteRaw) {
+    let text = String(quoteText || "").trim();
+    let author = String(quoteAuthor || "").trim();
+    const raw = String(quoteRaw || "").replace(/\r/g, "").trim();
+
+    if (!text && raw) {
+      const lines = raw.split("\n").map((l) => l.trim()).filter(Boolean);
+      let authorLine = "";
+      for (const line of lines) {
+        if (/^[-–—]\s*.+\s*[-–—]$/.test(line) || /^-\s*.+$/.test(line)) {
+          authorLine = line;
+          break;
+        }
+      }
+      if (authorLine && !author) {
+        author = authorLine
+          .replace(/^[-–—]\s*/, "")
+          .replace(/\s*[-–—]$/, "")
+          .trim();
+      }
+      if (!text) {
+        text = lines
+          .filter((line) => line !== authorLine)
+          .join(" ")
+          .replace(/^["'“”‘’]+/, "")
+          .replace(/["'“”‘’]+$/, "")
+          .trim();
+      }
+    }
+    return { text, author };
+  }
+  function normalizeHashtags(list) {
+    const arr = Array.isArray(list) ? list : [];
+    return uniqueList(
+      arr
+        .map((tag) => String(tag || "").trim())
+        .filter(Boolean)
+        .map((tag) => (tag.startsWith("#") ? tag : `#${tag}`))
+    );
+  }
+  function buildStructuredBlogDoc(data) {
+    const payload = data && typeof data === "object" ? data : {};
+    const title = String(payload.title || "").trim() || findPostTitleFromDom() || "MyDay 포스팅";
+    const quotePair = parseQuotePair(payload.quoteText, payload.quoteAuthor, payload.quote);
+    const images = Array.isArray(payload.images) ? payload.images : [];
+    const sectionsRaw = Array.isArray(payload.sections) ? payload.sections : [];
+
+    const sections = sectionsRaw.map((sec, idx) => {
+      const row = sec && typeof sec === "object" ? sec : {};
+      const subtitle = stripSectionMarker(row.subtitle || row.title || `섹션 ${idx + 1}`);
+      const body = String(row.body || row.text || "").trim();
+      const imageSrc = typeof images[idx] === "string" ? images[idx] : "";
+      return { subtitle, body, imageSrc };
+    }).filter((sec) => sec.subtitle || sec.body || sec.imageSrc);
+
+    return {
+      type: "structured",
+      title,
+      quoteText: quotePair.text,
+      quoteAuthor: quotePair.author,
+      sections,
+      hashtags: normalizeHashtags(payload.hashtags),
+      capturedAt: new Date().toISOString(),
+      source: "publish",
+    };
+  }
+  function captureBlogFromPublishRequest(url, requestBody) {
+    if (!/\/api\/publish(?:-async)?/i.test(String(url || ""))) return;
+    if (typeof requestBody !== "string" || !requestBody.trim()) return;
+    let parsed;
+    try {
+      parsed = JSON.parse(requestBody);
+    } catch { return; }
+
+    const doc = buildStructuredBlogDoc(parsed);
+    if (!doc.sections.length && !doc.quoteText) return;
+    lastGeneratedBlogDoc = doc;
+  }
   function captureBlogFromPayload(url, responseText) {
     if (!/\/api\/generate-blog/i.test(String(url || ""))) return;
     let parsed;
@@ -390,6 +474,9 @@
         return originalOpen.apply(this, args);
       };
       XMLHttpRequest.prototype.send = function (...args) {
+        try {
+          captureBlogFromPublishRequest(this.__mydayUrl || "", typeof args[0] === "string" ? args[0] : "");
+        } catch {}
         this.addEventListener("load", () => {
           try {
             captureBlogFromPayload(this.__mydayUrl || "", this.responseText || "");
@@ -402,6 +489,15 @@
     if (typeof window.fetch === "function") {
       const originalFetch = window.fetch.bind(window);
       window.fetch = async (...args) => {
+        try {
+          const url =
+            (typeof args[0] === "string" && args[0]) ||
+            (args[0] && typeof args[0].url === "string" && args[0].url) ||
+            "";
+          const reqBody = args[1] && typeof args[1].body === "string" ? args[1].body : "";
+          captureBlogFromPublishRequest(url, reqBody);
+        } catch {}
+
         const res = await originalFetch(...args);
         try {
           const url =
@@ -419,39 +515,83 @@
     }
   }
   function extractBlogFromDom(fallbackTitle) {
-    const candidates = [];
-    function pushCandidate(text, scoreBase) {
-      const t = String(text || "").trim();
-      if (t.length < 80) return;
-      const score =
-        scoreBase +
-        (t.includes("#") ? 45 : 0) +
-        (t.includes("\n") ? 30 : 0) +
-        Math.min(t.length / 20, 120);
-      candidates.push({ text: t, score });
+    const article =
+      document.querySelector("main article.bg-white.rounded-3xl") ||
+      document.querySelector("main article");
+    if (!article) return null;
+
+    const title =
+      String(article.querySelector("h1")?.textContent || "").trim() ||
+      fallbackTitle ||
+      "MyDay 포스팅";
+
+    const hashtags = normalizeHashtags(
+      Array.from(article.querySelectorAll("header span"))
+        .map((el) => String(el.textContent || "").trim())
+        .filter((txt) => txt.startsWith("#"))
+    );
+
+    const quoteImage =
+      article.querySelector('header img[alt*="철학"]') ||
+      article.querySelector('header img[alt*="명언"]') ||
+      article.querySelector("header img");
+    let quoteText = "";
+    let quoteAuthor = "";
+    if (!quoteImage) {
+      const quoteBlock = article.querySelector("header p");
+      const pair = parseQuotePair("", "", quoteBlock ? quoteBlock.innerText || quoteBlock.textContent || "" : "");
+      quoteText = pair.text;
+      quoteAuthor = pair.author;
     }
 
-    const textareas = document.querySelectorAll("textarea");
-    for (const ta of textareas) {
-      pushCandidate(ta.value, 120);
-    }
+    const sections = Array.from(article.querySelectorAll("section")).map((sec, idx) => {
+      const img = sec.querySelector("img");
+      const subtitleNode = sec.querySelector("h2, h3");
+      const body = Array.from(sec.querySelectorAll("p"))
+        .map((node) => String(node?.innerText || node?.textContent || "").trim())
+        .filter(Boolean)
+        .join("\n\n");
+      const subtitle = stripSectionMarker(
+        String(subtitleNode?.textContent || "").trim() || `섹션 ${idx + 1}`
+      );
+      const imageSrc = String(img?.getAttribute("src") || "").trim();
+      return { subtitle, body, imageSrc };
+    }).filter((sec) => sec.subtitle || sec.body || sec.imageSrc);
 
-    const editables = document.querySelectorAll("[contenteditable='true']");
-    for (const el of editables) {
-      pushCandidate(el.innerText || el.textContent || "", 90);
-    }
-
-    const likelyBlocks = document.querySelectorAll("article, section, pre, div[class*='post'], div[class*='content'], div[class*='body']");
-    for (const el of likelyBlocks) {
-      pushCandidate(el.innerText || el.textContent || "", 50);
-    }
-
-    if (!candidates.length) return null;
-    candidates.sort((a, b) => b.score - a.score);
-    const best = candidates[0];
-    const doc = parseBlogDocument(best.text, fallbackTitle);
+    if (!sections.length && !quoteImage && !quoteText) return null;
+    return {
+      type: "structured",
+      title,
+      quoteText,
+      quoteAuthor,
+      quoteImageSrc: quoteImage ? String(quoteImage.getAttribute("src") || "").trim() : "",
+      sections,
+      hashtags,
+      capturedAt: new Date().toISOString(),
+      source: "dom",
+    };
+  }
+  function toStructuredDoc(doc, fallbackTitle) {
     if (!doc) return null;
-    return { ...doc, source: "dom" };
+    if (doc.type === "structured") return doc;
+    const simpleBody = String(doc.bodyText || doc.fullText || "").trim();
+    return {
+      type: "structured",
+      title: String(doc.title || fallbackTitle || "MyDay 포스팅").trim(),
+      quoteText: "",
+      quoteAuthor: "",
+      quoteImageSrc: "",
+      sections: [
+        {
+          subtitle: "포스팅 본문",
+          body: simpleBody,
+          imageSrc: "",
+        },
+      ],
+      hashtags: normalizeHashtags(doc.hashtags),
+      capturedAt: doc.capturedAt || new Date().toISOString(),
+      source: doc.source || "fallback",
+    };
   }
   function getLatestBlogDocument(fallbackTitle) {
     const domDoc = extractBlogFromDom(fallbackTitle);
@@ -459,12 +599,23 @@
       lastGeneratedBlogDoc = domDoc;
       return domDoc;
     }
-    if (lastGeneratedBlogDoc) return lastGeneratedBlogDoc;
+    const cached = toStructuredDoc(lastGeneratedBlogDoc, fallbackTitle);
+    if (cached) return cached;
+
     return {
+      type: "structured",
       title: fallbackTitle || "MyDay 포스팅",
-      bodyText: "직전에 생성된 블로그 본문을 아직 찾지 못했어요.\n포스팅 글을 생성한 뒤 다시 눌러 주세요.",
+      quoteText: "",
+      quoteAuthor: "",
+      quoteImageSrc: "",
+      sections: [
+        {
+          subtitle: "안내",
+          body: "직전에 생성된 블로그 본문을 아직 찾지 못했어요.\n포스팅 글을 생성한 뒤 다시 이미지를 생성해 주세요.",
+          imageSrc: "",
+        },
+      ],
       hashtags: [],
-      fullText: "",
       capturedAt: new Date().toISOString(),
       source: "fallback",
     };
@@ -809,108 +960,208 @@
     });
     return lines;
   }
-  function drawBlogSnapshotImage(canvas, doc) {
+  function loadImageSafe(src) {
+    return new Promise((resolve) => {
+      const url = String(src || "").trim();
+      if (!url) {
+        resolve(null);
+        return;
+      }
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => resolve(img);
+      img.onerror = () => resolve(null);
+      img.src = url;
+    });
+  }
+  async function drawBlogSnapshotImage(canvas, doc) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     const WIDTH = 1080;
     const PAD_X = 84;
-    const TITLE_LINE_H = 70;
-    const BODY_LINE_H = 48;
-    const BODY_EMPTY_H = 20;
+    const TITLE_LINE_H = 68;
+    const BODY_LINE_H = 46;
+    const BODY_EMPTY_H = 16;
     const CONTENT_W = WIDTH - PAD_X * 2;
-    const titleText = doc.title || "MyDay 포스팅";
-    const bodyText = doc.bodyText || doc.fullText || "";
-    const hashtagsLine = (doc.hashtags && doc.hashtags.length) ? doc.hashtags.join(" ") : "";
+    const titleText = String(doc.title || "MyDay 포스팅").trim();
 
     ctx.font = '900 56px "Noto Sans KR", sans-serif';
     const titleLines = wrapCanvasLine(ctx, titleText, CONTENT_W);
 
-    ctx.font = '500 34px "Noto Sans KR", sans-serif';
-    const bodyLines = buildWrappedBodyLines(ctx, bodyText, CONTENT_W);
+    const quoteText = String(doc.quoteText || "").trim();
+    const quoteAuthor = String(doc.quoteAuthor || "").trim();
+    const quoteImageSrc = String(doc.quoteImageSrc || "").trim();
 
-    ctx.font = '700 30px "Noto Sans KR", sans-serif';
-    const tagLines = hashtagsLine ? wrapCanvasLine(ctx, hashtagsLine, CONTENT_W) : [];
+    ctx.font = '500 32px "Noto Sans KR", sans-serif';
+    const quoteLines = quoteText ? wrapCanvasLine(ctx, quoteText, CONTENT_W - 40) : [];
 
-    let dynamicHeight = 150;
-    dynamicHeight += titleLines.length * TITLE_LINE_H;
-    dynamicHeight += 34;
-    for (const line of bodyLines) {
-      dynamicHeight += line ? BODY_LINE_H : BODY_EMPTY_H;
+    const sections = Array.isArray(doc.sections) ? doc.sections : [];
+    const sectionLayouts = [];
+    for (const sec of sections) {
+      const subtitle = String(sec.subtitle || "").trim();
+      const body = String(sec.body || "").trim();
+      const image = await loadImageSafe(sec.imageSrc);
+      ctx.font = '700 34px "Noto Sans KR", sans-serif';
+      const subtitleLines = subtitle ? wrapCanvasLine(ctx, subtitle, CONTENT_W) : [];
+      ctx.font = '500 30px "Noto Sans KR", sans-serif';
+      const bodyLines = body ? buildWrappedBodyLines(ctx, body, CONTENT_W) : [];
+      let imageHeight = 0;
+      if (image) {
+        const naturalH = CONTENT_W * (image.naturalHeight || image.height) / Math.max(1, image.naturalWidth || image.width);
+        imageHeight = Math.max(240, Math.min(1600, Math.round(naturalH)));
+      }
+      sectionLayouts.push({
+        subtitleLines,
+        bodyLines,
+        image,
+        imageHeight,
+      });
     }
-    dynamicHeight += 24;
-    dynamicHeight += tagLines.length * 44;
-    dynamicHeight += 140;
 
-    const HEIGHT = Math.max(1400, dynamicHeight);
+    const hashtags = normalizeHashtags(doc.hashtags);
+    ctx.font = '700 28px "Noto Sans KR", sans-serif';
+    const tagLines = hashtags.length ? wrapCanvasLine(ctx, hashtags.join(" "), CONTENT_W) : [];
+
+    let dynamicHeight = 140;
+    dynamicHeight += titleLines.length * TITLE_LINE_H + 36;
+    if (quoteImageSrc || quoteText) {
+      dynamicHeight += 52;
+      if (quoteImageSrc) {
+        dynamicHeight += 460;
+      } else {
+        dynamicHeight += 26;
+        dynamicHeight += quoteLines.length * 52;
+        if (quoteAuthor) dynamicHeight += 52;
+      }
+      dynamicHeight += 36;
+    }
+    for (const sec of sectionLayouts) {
+      dynamicHeight += 44;
+      if (sec.imageHeight) dynamicHeight += sec.imageHeight + 22;
+      dynamicHeight += sec.subtitleLines.length * 52;
+      for (const line of sec.bodyLines) {
+        dynamicHeight += line ? BODY_LINE_H : BODY_EMPTY_H;
+      }
+      dynamicHeight += 30;
+    }
+    dynamicHeight += tagLines.length ? 26 + tagLines.length * 40 : 0;
+    dynamicHeight += 86;
+
+    const HEIGHT = Math.max(1700, dynamicHeight);
     canvas.width = WIDTH;
     canvas.height = HEIGHT;
 
-    const bg = ctx.createLinearGradient(0, 0, 0, HEIGHT);
-    bg.addColorStop(0, "#fff4fa");
-    bg.addColorStop(0.52, "#fff9fd");
-    bg.addColorStop(1, "#ffffff");
-    ctx.fillStyle = bg;
+    ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
-    ctx.fillStyle = "rgba(255,255,255,0.92)";
+    ctx.fillStyle = "#ffffff";
     ctx.beginPath();
-    roundRect(ctx, 34, 34, WIDTH - 68, HEIGHT - 68, 30);
+    roundRect(ctx, 22, 22, WIDTH - 44, HEIGHT - 44, 26);
     ctx.fill();
-    ctx.strokeStyle = "#ffd9e9";
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = "#f0f0f0";
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
-    roundRect(ctx, 34, 34, WIDTH - 68, HEIGHT - 68, 30);
+    roundRect(ctx, 22, 22, WIDTH - 44, HEIGHT - 44, 26);
     ctx.stroke();
 
-    let y = 96;
+    let y = 88;
     ctx.textAlign = "left";
     ctx.textBaseline = "alphabetic";
 
-    ctx.fillStyle = "#c44978";
-    ctx.font = '800 28px "Noto Sans KR", sans-serif';
-    ctx.fillText("MyDay 블로그 스냅샷", PAD_X, y);
-    y += 28;
-
-    ctx.strokeStyle = "#ffd2e5";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(PAD_X, y + 16);
-    ctx.lineTo(WIDTH - PAD_X, y + 16);
-    ctx.stroke();
-    y += 64;
-
-    ctx.fillStyle = "#7b2f54";
+    ctx.fillStyle = "#242424";
     ctx.font = '900 56px "Noto Sans KR", sans-serif';
     titleLines.forEach((line) => {
       ctx.fillText(line, PAD_X, y);
       y += TITLE_LINE_H;
     });
-    y += 14;
 
-    ctx.fillStyle = "#5e3a4a";
-    ctx.font = '500 34px "Noto Sans KR", sans-serif';
-    bodyLines.forEach((line) => {
-      if (!line) {
-        y += BODY_EMPTY_H;
-        return;
+    if (quoteImageSrc || quoteText) {
+      y += 24;
+      ctx.fillStyle = "#5b5b5b";
+      ctx.font = '700 32px "Noto Sans KR", sans-serif';
+      ctx.fillText("오늘의 철학", PAD_X, y);
+      y += 30;
+
+      if (quoteImageSrc) {
+        const quoteImg = await loadImageSafe(quoteImageSrc);
+        if (quoteImg) {
+          const h = Math.max(260, Math.min(460, Math.round(CONTENT_W * (quoteImg.naturalHeight || quoteImg.height) / Math.max(1, quoteImg.naturalWidth || quoteImg.width))));
+          ctx.save();
+          ctx.beginPath();
+          roundRect(ctx, PAD_X, y, CONTENT_W, h, 20);
+          ctx.clip();
+          ctx.drawImage(quoteImg, 0, 0, quoteImg.naturalWidth || quoteImg.width, quoteImg.naturalHeight || quoteImg.height, PAD_X, y, CONTENT_W, h);
+          ctx.restore();
+          y += h + 20;
+        }
+      } else {
+        y += 20;
+        ctx.fillStyle = "#424242";
+        ctx.font = '500 32px "Noto Sans KR", sans-serif';
+        quoteLines.forEach((line) => {
+          ctx.fillText(line, PAD_X + 16, y);
+          y += 52;
+        });
+        if (quoteAuthor) {
+          ctx.fillStyle = "#6d6d6d";
+          ctx.font = '600 28px "Noto Sans KR", sans-serif';
+          ctx.fillText(`- ${quoteAuthor} -`, PAD_X + 16, y);
+          y += 48;
+        }
       }
-      ctx.fillText(line, PAD_X, y);
-      y += BODY_LINE_H;
-    });
+      y += 20;
+    }
+
+    for (let idx = 0; idx < sectionLayouts.length; idx += 1) {
+      const sec = sectionLayouts[idx];
+      ctx.fillStyle = "#5b5b5b";
+      ctx.font = '700 32px "Noto Sans KR", sans-serif';
+      ctx.fillText(`섹션 ${idx + 1}`, PAD_X, y);
+      y += 30;
+
+      if (sec.image && sec.imageHeight) {
+        ctx.save();
+        ctx.beginPath();
+        roundRect(ctx, PAD_X, y, CONTENT_W, sec.imageHeight, 16);
+        ctx.clip();
+        ctx.drawImage(sec.image, 0, 0, sec.image.naturalWidth || sec.image.width, sec.image.naturalHeight || sec.image.height, PAD_X, y, CONTENT_W, sec.imageHeight);
+        ctx.restore();
+        y += sec.imageHeight + 18;
+      }
+
+      ctx.fillStyle = "#232323";
+      ctx.font = '700 34px "Noto Sans KR", sans-serif';
+      sec.subtitleLines.forEach((line) => {
+        ctx.fillText(line, PAD_X, y);
+        y += 52;
+      });
+
+      ctx.fillStyle = "#3d3d3d";
+      ctx.font = '500 30px "Noto Sans KR", sans-serif';
+      sec.bodyLines.forEach((line) => {
+        if (!line) {
+          y += BODY_EMPTY_H;
+          return;
+        }
+        ctx.fillText(line, PAD_X, y);
+        y += BODY_LINE_H;
+      });
+      y += 24;
+    }
 
     if (tagLines.length > 0) {
-      y += 16;
-      ctx.fillStyle = "#c14978";
-      ctx.font = '700 30px "Noto Sans KR", sans-serif';
+      y += 8;
+      ctx.fillStyle = "#545454";
+      ctx.font = '700 28px "Noto Sans KR", sans-serif';
       tagLines.forEach((line) => {
         ctx.fillText(line, PAD_X, y);
-        y += 44;
+        y += 40;
       });
     }
 
     const footer = formatDateTime(doc.capturedAt || new Date().toISOString());
-    ctx.fillStyle = "#c386a2";
+    ctx.fillStyle = "#9a9a9a";
     ctx.font = '600 24px "Noto Sans KR", sans-serif';
     ctx.fillText(`생성시각 ${footer || "-"}`, PAD_X, HEIGHT - 54);
   }
@@ -1138,7 +1389,9 @@
       if (pane === "share") {
         overlay.classList.add("open");
         setActiveNav(shareBtn);
-        renderShareImage();
+        renderShareImage().catch(() => {
+          setShareStatus("이미지 생성 중 오류가 발생했어요. 다시 생성 버튼을 눌러 주세요.", "fail");
+        });
       } else if (pane === "history") {
         historyOverlay.classList.add("open");
         setActiveNav(historyBtn);
@@ -1156,18 +1409,29 @@
       if (tone === "fail") shareStatus.classList.add("fail");
       shareStatus.textContent = message;
     }
-    function renderShareImage() {
+    async function renderShareImage() {
       const fallbackTitle = (lastPublishData && lastPublishData.title) || "MyDay 포스팅";
       const doc = getLatestBlogDocument(fallbackTitle);
-      drawBlogSnapshotImage(cardCanvas, doc);
+      await drawBlogSnapshotImage(cardCanvas, doc);
       setShareStatus("지금 이미지가 나타났습니다. 이미지 또는 버튼을 눌러 복사해 주세요.", "");
     }
     async function copyShareImage() {
-      const ok = await copyCanvasImage(cardCanvas);
-      if (ok) {
-        setShareStatus("복사 완료! 원하는 곳에 붙여넣기해서 인스타, SNS 등에 활용해 보세요.", "ok");
-      } else {
-        setShareStatus("이 환경에서는 이미지 복사가 지원되지 않습니다. 다시 생성 후 저장해서 사용해 주세요.", "fail");
+      try {
+        if (!cardCanvas.width || !cardCanvas.height) {
+          await renderShareImage();
+        }
+        let ok = await copyCanvasImage(cardCanvas);
+        if (!ok && cardCanvas.width && cardCanvas.height) {
+          await renderShareImage();
+          ok = await copyCanvasImage(cardCanvas);
+        }
+        if (ok) {
+          setShareStatus("복사 완료! 원하는 곳에 붙여넣기해서 인스타, SNS 등에 활용해 보세요.", "ok");
+        } else {
+          setShareStatus("이 환경에서는 이미지 복사가 지원되지 않습니다. 다시 생성 후 저장해서 사용해 주세요.", "fail");
+        }
+      } catch {
+        setShareStatus("이미지 복사 중 오류가 발생했어요. 다시 생성 후 시도해 주세요.", "fail");
       }
     }
     function renderHistory() {
@@ -1271,7 +1535,11 @@
     });
 
     copyImageBtn.addEventListener("click", copyShareImage);
-    refreshImageBtn.addEventListener("click", renderShareImage);
+    refreshImageBtn.addEventListener("click", () => {
+      renderShareImage().catch(() => {
+        setShareStatus("이미지 생성 중 오류가 발생했어요. 다시 눌러 주세요.", "fail");
+      });
+    });
     cardCanvas.addEventListener("click", copyShareImage);
     clearHistoryBtn.addEventListener("click", () => {
       saveHistory([]);

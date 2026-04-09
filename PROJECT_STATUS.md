@@ -1,17 +1,17 @@
 # PROJECT_STATUS
 
-- Last Updated: 2026-04-09 00:10:47
+- Last Updated: 2026-04-09 10:03:18
 - Policy: 작업 시작 전 이 파일을 먼저 확인하고, 없으면 생성 후 유지
 - Harness Mode: ENABLED
 - Deploy Rule: 코드 수정 후 `빌드 -> 푸시 -> 설치 -> 실행` 필수
 - Status Rule: 코드 변경/기능 추가/수정/삭제 후 반드시 이 파일 갱신 (필수)
 
 ## Current Target
-- App Label: `MyDay\n2.6`
+- App Label: `MyDay\n2.8`
 - App Id: `com.mooja.myday20`
 - Android Package: `com.mooja.myday20`
 - Launch Component: `com.mooja.myday20/com.mooja.autopost.MainActivity`
-- Current Version: 2.6
+- Current Version: 2.8
 
 ## Structure
 - `app/` : Android(smali/apktool) project
@@ -29,6 +29,7 @@
 | 2026-04-08 | 2.4 | 기존 챗봇 아이콘/로딩 제거 후 빠른도움 내 RAG FAQ 챗봇(100 Intent, 500 Q/A)으로 교체 |
 | 2026-04-08 | 2.5 | 하네스 배포 완료 (빌드/푸시/설치/실행) |
 | 2026-04-09 | 2.6 | 공유·초대 콘텐츠 전면 교체: 직전 블로그 본문(제목~해시태그) 긴 세로 이미지 생성 + 클릭/버튼 이미지 복사 |
+| 2026-04-09 | 2.6 | 챗봇 대화체 개선: 시스템 프롬프트 페르소나/말투 규칙 강화, temperature 0.7→0.9, 설명서체→재치있는 대화체 |
 
 ## Next Rule
 - 코드 수정 후 이 파일의 `Last Updated`와 `Change Log`를 갱신

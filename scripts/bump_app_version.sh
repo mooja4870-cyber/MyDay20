@@ -26,15 +26,10 @@ major="${major:-0}"
 minor="${minor:-0}"
 minor=$((10#$minor + 1))
 
-if (( minor >= 10 )); then
-  major=$((10#$major + 1))
-  minor=0
-fi
-
 NEXT_VERSION="${major}.${minor}"
 
 NEXT_VERSION="$NEXT_VERSION" perl -0pi -e 's/(Ix="v )([0-9]+\.[0-9]+)(")/$1$ENV{NEXT_VERSION}$3/g' "$JS_FILE"
 NEXT_VERSION="$NEXT_VERSION" perl -0pi -e 's/("appName": "MyDay\\\\n)([0-9]+\.[0-9]+)(")/$1$ENV{NEXT_VERSION}$3/g' "$CAP_CONFIG"
-NEXT_VERSION="$NEXT_VERSION" perl -0pi -e 's/(<string name="app_name">"MyDay\s*)(?:v\s*)?([0-9]+\.[0-9]+)("<\/string>)/$1$ENV{NEXT_VERSION}$3/s; s/(<string name="title_activity_main">"MyDay\s*)(?:v\s*)?([0-9]+\.[0-9]+)("<\/string>)/$1$ENV{NEXT_VERSION}$3/s;' "$STRINGS_XML"
+NEXT_VERSION="$NEXT_VERSION" perl -0pi -e 's{(<string name="app_name">).*?(</string>)}{$1MyDay\\n$ENV{NEXT_VERSION}$2}s; s{(<string name="title_activity_main">).*?(</string>)}{$1MyDay\\n$ENV{NEXT_VERSION}$2}s;' "$STRINGS_XML"
 
 echo "$NEXT_VERSION"

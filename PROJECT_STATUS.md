@@ -1,17 +1,17 @@
 # PROJECT_STATUS
 
-- Last Updated: 2026-04-09 10:45:44
+- Last Updated: 2026-04-09 11:54:17
 - Policy: 작업 시작 전 이 파일을 먼저 확인하고, 없으면 생성 후 유지
 - Harness Mode: ENABLED
 - Deploy Rule: 코드 수정 후 `빌드 -> 푸시 -> 설치 -> 실행` 필수
 - Status Rule: 코드 변경/기능 추가/수정/삭제 후 반드시 이 파일 갱신 (필수)
 
 ## Current Target
-- App Label: `MyDay\n2.9`
+- App Label: `MyDay\n2.10`
 - App Id: `com.mooja.myday20`
 - Android Package: `com.mooja.myday20`
 - Launch Component: `com.mooja.myday20/com.mooja.autopost.MainActivity`
-- Current Version: 2.9
+- Current Version: 2.10
 
 ## Structure
 - `app/` : Android(smali/apktool) project
@@ -33,6 +33,8 @@
 | 2026-04-09 | 2.8 | RAG FAQ 챗봇 대화체 전면 개선: RAG_FACTS 22개(앱소개 추가), 답변/앵글 전체 대화체로, fallback·환영메시지 개선, 기존 chatbot.js 대화기능 제거 |
 | 2026-04-09 | 2.8 | 서버사이드 RAG 챗봇 구축: chatRagService.ts(벡터 인덱스+코사인유사도+Gemini Flash), /api/chat 엔드포인트, 클라이언트 fallback→서버 RAG 연동 |
 | 2026-04-09 | 2.8 | 용어 질문 라우팅 개선: "~이 뭐니/뭐야/이란" 패턴 감지 → 서버 RAG 직행, intro fact 키워드 중복 제거 |
+| 2026-04-09 | 2.9 | 용어 RAG 강화: 앱 용어 사전 확장(40+), 조사/축약/물음표 형태 감지, 화면 텍스트 기반 용어 추출, 용어 질문 시 로컬 설명 우선 + 서버 RAG 연동 |
+| 2026-04-09 | 2.10 | 용어 RAG 강화본 배포: 앱 버전 업그레이드, 상태 파일 갱신, 빌드/설치/실행 파이프라인 반영 |
 
 ## Next Rule
 - 코드 수정 후 이 파일의 `Last Updated`와 `Change Log`를 갱신

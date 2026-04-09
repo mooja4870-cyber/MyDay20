@@ -1,17 +1,17 @@
 # PROJECT_STATUS
 
-- Last Updated: 2026-04-09 14:34:54
+- Last Updated: 2026-04-09 15:01:22
 - Policy: 작업 시작 전 이 파일을 먼저 확인하고, 없으면 생성 후 유지
 - Harness Mode: ENABLED
 - Deploy Rule: 코드 수정 후 `빌드 -> 푸시 -> 설치 -> 실행` 필수
 - Status Rule: 코드 변경/기능 추가/수정/삭제 후 반드시 이 파일 갱신 (필수)
 
 ## Current Target
-- App Label: `MyDay\n2.19`
+- App Label: `MyDay\n2.20`
 - App Id: `com.mooja.myday20`
 - Android Package: `com.mooja.myday20`
 - Launch Component: `com.mooja.myday20/com.mooja.autopost.MainActivity`
-- Current Version: 2.19
+- Current Version: 2.20
 
 ## Structure
 - `app/` : Android(smali/apktool) project
@@ -49,6 +49,7 @@
 | 2026-04-09 | 2.18 | 중복 발행 잠금 도입: 이전 포스팅이 `queued`/`working` 상태이면 같은 계정의 새 발행을 차단하고 안내문으로 대기 유도해 로그인·세션 준비 실패 재발 경로를 차단 |
 | 2026-04-09 | 2.18 | 발행 상태 복구 강화: 활성 `jobId`와 상태를 로컬에 저장해 앱 재실행 후에도 기존 대기 작업을 복원하고 완료/실패 시 잠금을 자동 해제 |
 | 2026-04-09 | 2.19 | 버전 정렬 재배포: 동일 기능 기준 설치본/표시 버전을 `2.19`로 상향해 앱 표기와 배포 버전을 일치 |
+| 2026-04-09 | 2.20 | 서버 RAG 지식 확장: 버전 이력 청크 5개(v2.2~v2.19) + 기술 용어 청크 5개(비동기큐/CORS/하네스/RAG/중복발행잠금) 추가 |
 
 ## Next Rule
 - 코드 수정 후 이 파일의 `Last Updated`와 `Change Log`를 갱신

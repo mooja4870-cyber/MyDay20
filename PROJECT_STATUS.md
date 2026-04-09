@@ -1,6 +1,6 @@
 # PROJECT_STATUS
 
-- Last Updated: 2026-04-09 16:22:00
+- Last Updated: 2026-04-09 23:05:00
 - Policy: 작업 시작 전 이 파일을 먼저 확인하고, 없으면 생성 후 유지
 - Harness Mode: ENABLED
 - Deploy Rule: 코드 수정 후 `빌드 -> 푸시 -> 설치 -> 실행` 필수
@@ -53,6 +53,7 @@
 | 2026-04-09 | 2.20 | 계정별 세션 분리: browser_session_{username}.json으로 개별 관리, 타 계정 세션 혼용 방지, 자동 로그인 항상 시도 |
 | 2026-04-09 | 2.21 | 서버 RAG 앱 용어 사전 28개 + 버전 이력/기술 용어 청크 추가, 용어 질문 서버 RAG 직행 로직 적용 |
 | 2026-04-09 | 2.23 | 소제목 개선: Gemini 프롬프트에 본문 요약 소제목 생성 지시, "소제목 1" → 섹션 내용 대표 문구로 자동 생성 |
+| 2026-04-09 | 2.24 | 소제목 3중 보완: geminiService 프롬프트 + naverPublisher sanitize/fallback + normalizeSections 모두 generic 소제목 제거 |
 
 ## Next Rule
 - 코드 수정 후 이 파일의 `Last Updated`와 `Change Log`를 갱신

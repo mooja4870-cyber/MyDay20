@@ -1829,9 +1829,13 @@
       ragInput.value = "";
       askRag(q);
     }
+    function showServicePreparingPopup() {
+      closeAll();
+      window.alert("서비스 준비 중입니다.\n완성되면 더 좋은 서비스로 찾아 뵙겠습니다.\n감사합니다");
+    }
 
-    shareBtn.addEventListener("click", () => togglePane("share"));
-    historyBtn.addEventListener("click", () => togglePane("history"));
+    shareBtn.addEventListener("click", showServicePreparingPopup);
+    historyBtn.addEventListener("click", showServicePreparingPopup);
     helpBtn.addEventListener("click", () => togglePane("help"));
     closeBtn.addEventListener("click", closeAll);
     historyCloseBtn.addEventListener("click", closeAll);

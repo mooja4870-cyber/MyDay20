@@ -109,26 +109,28 @@
      - each intent has 5 questions + 5 answers
      ══════════════════════════════════════════ */
   const RAG_FACTS = [
-    { categoryId: "onboarding", categoryLabel: "온보딩/계정", factId: "first_setup", ask: "초기 설정 입력 항목", answer: "앱 첫 실행 시 네이버 아이디, 네이버 비밀번호, 블로그 아이디, Gemini API 키를 입력하고 저장하면 됩니다.", keywords: ["초기설정", "온보딩", "입력", "계정"] },
-    { categoryId: "onboarding", categoryLabel: "온보딩/계정", factId: "reopen_onboarding", ask: "온보딩 다시 보기", answer: "설정 화면에서 온보딩 다시 보기 또는 초기 설정 다시 하기를 선택하면 처음 단계부터 다시 진행할 수 있습니다.", keywords: ["온보딩", "다시", "초기설정"] },
-    { categoryId: "api", categoryLabel: "API 키", factId: "api_issue", ask: "Gemini API 키 발급", answer: "Google AI Studio(aistudio.google.com) 로그인 후 Get API key 또는 Create API key 메뉴에서 발급할 수 있습니다.", keywords: ["Gemini", "API", "키", "발급"] },
-    { categoryId: "api", categoryLabel: "API 키", factId: "api_limit", ask: "Gemini API 사용량 제한", answer: "Gemini API는 일일 사용량 제한이 있을 수 있어서 초과 시 잠시 기다린 뒤 다시 시도해야 합니다.", keywords: ["사용량", "제한", "초과", "재시도"] },
-    { categoryId: "photo", categoryLabel: "사진 업로드", factId: "photo_count", ask: "사진 업로드 개수 제한", answer: "사진은 최소 1장, 최대 10장까지 선택할 수 있습니다.", keywords: ["사진", "이미지", "최소", "최대", "10장"] },
-    { categoryId: "photo", categoryLabel: "사진 업로드", factId: "photo_type", ask: "업로드 가능한 파일 형식", answer: "이미지 파일만 업로드할 수 있으며 사진 선택 후에는 확인 버튼을 눌러야 다음 단계로 진행됩니다.", keywords: ["이미지", "파일", "형식", "확인버튼"] },
-    { categoryId: "place", categoryLabel: "장소 선택", factId: "place_multi", ask: "장소 복수 선택", answer: "장소는 복수 선택이 가능하며 상황에 맞는 분위기 반영에 사용됩니다.", keywords: ["장소", "복수선택", "분위기"] },
-    { categoryId: "place", categoryLabel: "장소 선택", factId: "place_other", ask: "기타 장소 직접 입력", answer: "목록에 없는 장소는 기타 직접 입력으로 자유롭게 추가할 수 있습니다.", keywords: ["기타", "직접입력", "장소"] },
-    { categoryId: "reason", categoryLabel: "이유 선택", factId: "reason_multi", ask: "이유 복수 선택", answer: "이유도 복수 선택이 가능하며 데이트, 산책, 공부 같은 목적을 함께 고를 수 있습니다.", keywords: ["이유", "복수선택", "목적"] },
-    { categoryId: "reason", categoryLabel: "이유 선택", factId: "reason_effect", ask: "이유 선택이 글에 미치는 영향", answer: "선택한 이유는 AI 글의 분위기와 표현 방향을 정할 때 반영됩니다.", keywords: ["분위기", "표현", "AI", "반영"] },
-    { categoryId: "person", categoryLabel: "인물 입력", factId: "person_optional", ask: "사진 속 인물 입력 필수 여부", answer: "사진 속 인물 입력은 선택 사항이라 사람이 없는 사진이면 비워도 됩니다.", keywords: ["인물", "선택사항", "비워도"] },
-    { categoryId: "person", categoryLabel: "인물 입력", factId: "person_example", ask: "인물 입력 예시", answer: "친구와 나, 가족들, 남자친구처럼 사진에 나온 사람을 자유롭게 적으면 됩니다.", keywords: ["예시", "친구", "가족", "자유입력"] },
-    { categoryId: "ai", categoryLabel: "AI 글 생성", factId: "ai_auto", ask: "AI 글 자동 생성 시작 시점", answer: "사진, 장소, 이유, 인물 단계 입력을 마치면 AI가 블로그 글 생성을 진행합니다.", keywords: ["AI", "자동생성", "4단계"] },
-    { categoryId: "ai", categoryLabel: "AI 글 생성", factId: "ai_regen_edit", ask: "글 재생성 및 본문 수정", answer: "포스팅 글 새로 생성하기로 다른 스타일을 받을 수 있고 포스팅 본문 화면에서 직접 수정도 가능합니다.", keywords: ["재생성", "스타일", "본문수정"] },
-    { categoryId: "posting", categoryLabel: "블로그 포스팅", factId: "post_run", ask: "네이버 블로그 자동 포스팅 실행", answer: "자동 포스팅 실행 버튼을 누르면 AI가 만든 글과 사진을 네이버 블로그로 업로드합니다.", keywords: ["자동포스팅", "실행", "업로드"] },
-    { categoryId: "posting", categoryLabel: "블로그 포스팅", factId: "post_result", ask: "포스팅 성공/실패 대응", answer: "성공 시 완료 안내 메시지가 뜨고 실패하면 다시 포스팅으로 빠르게 재시도할 수 있습니다.", keywords: ["성공", "실패", "재시도"] },
-    { categoryId: "error", categoryLabel: "오류 대응", factId: "safe_policy", ask: "안전 정책 차단 메시지", answer: "입력 내용이 안전 정책에 차단되면 표현을 완화해서 다시 시도하면 됩니다.", keywords: ["안전정책", "차단", "표현완화"] },
-    { categoryId: "error", categoryLabel: "오류 대응", factId: "network_issue", ask: "네트워크 관련 오류", answer: "AI 생성과 자동 포스팅은 인터넷 연결이 필수라 연결 상태를 확인한 뒤 재시도해야 합니다.", keywords: ["네트워크", "인터넷", "오류", "재시도"] },
-    { categoryId: "settings", categoryLabel: "설정 관리", factId: "settings_manage", ask: "계정 및 API 설정 변경", answer: "설정 화면의 계정 및 API 관리에서 네이버 계정, 블로그 아이디, Gemini API 키를 수정할 수 있습니다.", keywords: ["설정", "계정", "API", "변경"] },
-    { categoryId: "settings", categoryLabel: "설정 관리", factId: "settings_reset", ask: "초기 설정 다시 하기", answer: "초기 설정 다시 하기를 실행하면 온보딩 흐름으로 돌아가 입력값을 새로 저장할 수 있습니다.", keywords: ["초기설정", "리셋", "온보딩"] },
+    { categoryId: "intro", categoryLabel: "앱 소개", factId: "what_is_app", ask: "이 앱은 뭐하는 앱", answer: "사진만 골라주면 AI가 감성 블로그 글을 뚝딱 써주고, 네이버 블로그에 바로 올려주는 앱이에요! 글쓰기는 귀찮은데 블로그는 하고 싶을 때 딱이죠 ✨", keywords: ["앱", "뭐하는", "소개", "어떤앱", "뭔가요", "뭐야", "뭐니", "무슨앱", "역할", "기능"] },
+    { categoryId: "intro", categoryLabel: "앱 소개", factId: "how_to_use", ask: "앱 사용 방법", answer: "사진 고르고 → 장소 선택 → 이유 선택 → 인물 입력하면 끝! AI가 알아서 감성글을 만들어줘요. 4단계면 블로그 한 편 완성이에요 😊", keywords: ["사용법", "어떻게", "쓰는법", "사용방법", "이용", "시작"] },
+    { categoryId: "onboarding", categoryLabel: "온보딩/계정", factId: "first_setup", ask: "초기 설정 입력 항목", answer: "앱이랑 처음 인사하는 시간이에요! 네이버 아이디, 비밀번호, 블로그 아이디, Gemini API 키만 넣어주면 준비 끝이에요 🎉", keywords: ["초기설정", "온보딩", "입력", "계정", "처음"] },
+    { categoryId: "onboarding", categoryLabel: "온보딩/계정", factId: "reopen_onboarding", ask: "온보딩 다시 보기", answer: "설정 화면에서 '온보딩 다시 보기'를 누르면 처음 그 설정 화면으로 돌아갈 수 있어요. 마치 타임머신처럼요 ⏰", keywords: ["온보딩", "다시", "초기설정"] },
+    { categoryId: "api", categoryLabel: "API 키", factId: "api_issue", ask: "Gemini API 키 발급", answer: "AI를 부르는 마법 주문 같은 거예요! Google AI Studio(aistudio.google.com)에서 무료로 받을 수 있어요. 'Create API key' 버튼 하나면 끝! 🔑", keywords: ["Gemini", "API", "키", "발급", "받는법", "어디서"] },
+    { categoryId: "api", categoryLabel: "API 키", factId: "api_limit", ask: "Gemini API 사용량 제한", answer: "하루에 쓸 수 있는 양이 정해져 있어요. 초과하면 잠깐 쉬었다 다시 해보면 돼요. AI도 휴식이 필요하거든요 😅", keywords: ["사용량", "제한", "초과", "재시도"] },
+    { categoryId: "photo", categoryLabel: "사진 업로드", factId: "photo_count", ask: "사진 업로드 개수 제한", answer: "1장부터 10장까지 골라주시면 돼요! 많이 넣을수록 AI가 더 풍성한 글을 써줘요 📸", keywords: ["사진", "이미지", "최소", "최대", "10장", "몇장"] },
+    { categoryId: "photo", categoryLabel: "사진 업로드", factId: "photo_type", ask: "업로드 가능한 파일 형식", answer: "이미지 파일이면 다 OK예요! 사진 고른 다음에 '확인' 버튼 꼭 눌러주세요~ 안 누르면 다음으로 못 넘어가거든요 😉", keywords: ["이미지", "파일", "형식", "확인버튼"] },
+    { categoryId: "place", categoryLabel: "장소 선택", factId: "place_multi", ask: "장소 복수 선택", answer: "카페도 갔다 공원도 갔다? 여러 개 골라도 돼요! AI가 그 분위기 다 살려서 글을 써줘요 🏖️", keywords: ["장소", "복수선택", "분위기", "여러개"] },
+    { categoryId: "place", categoryLabel: "장소 선택", factId: "place_other", ask: "기타 장소 직접 입력", answer: "목록에 없는 특별한 장소? '기타 직접 입력'으로 마음껏 적어주세요! 세상 모든 장소가 다 가능해요 🌍", keywords: ["기타", "직접입력", "장소"] },
+    { categoryId: "reason", categoryLabel: "이유 선택", factId: "reason_multi", ask: "이유 복수 선택", answer: "데이트하면서 카페 투어도 했다면 둘 다 선택! 이유도 여러 개 고를 수 있어요 💕", keywords: ["이유", "복수선택", "목적", "여러개"] },
+    { categoryId: "reason", categoryLabel: "이유 선택", factId: "reason_effect", ask: "이유 선택이 글에 미치는 영향", answer: "선택한 이유에 따라 AI가 글의 분위기를 맞춰줘요. 데이트면 로맨틱하게, 운동이면 활기차게! 🎨", keywords: ["분위기", "표현", "AI", "반영"] },
+    { categoryId: "person", categoryLabel: "인물 입력", factId: "person_optional", ask: "사진 속 인물 입력 필수 여부", answer: "사람 없는 풍경이나 음식 사진이면 비워도 전혀 문제없어요! 선택사항이거든요 😊", keywords: ["인물", "선택사항", "비워도", "필수"] },
+    { categoryId: "person", categoryLabel: "인물 입력", factId: "person_example", ask: "인물 입력 예시", answer: "'친구와 나', '가족들', '남자친구'처럼 편하게 적어주면 돼요. AI가 글에 자연스럽게 녹여줘요 ✍️", keywords: ["예시", "친구", "가족", "자유입력"] },
+    { categoryId: "ai", categoryLabel: "AI 글 생성", factId: "ai_auto", ask: "AI 글 자동 생성 시작 시점", answer: "4단계를 다 채우면 AI가 바로 글쓰기 시작해요! 사진, 장소, 이유, 인물까지 넣으면 자동으로 뚝딱 ✨", keywords: ["AI", "자동생성", "4단계", "시작"] },
+    { categoryId: "ai", categoryLabel: "AI 글 생성", factId: "ai_regen_edit", ask: "글 재생성 및 본문 수정", answer: "'포스팅 글 새로 생성하기' 누르면 다른 스타일로 다시 써줘요! 마음에 들 때까지 몇 번이든 OK. 직접 수정도 가능해요 ✏️", keywords: ["재생성", "스타일", "본문수정", "다시"] },
+    { categoryId: "posting", categoryLabel: "블로그 포스팅", factId: "post_run", ask: "네이버 블로그 자동 포스팅 실행", answer: "버튼 하나면 AI가 만든 글이랑 사진이 네이버 블로그로 슝~ 올라가요! 진짜 원클릭이에요 🚀", keywords: ["자동포스팅", "실행", "업로드", "올리기"] },
+    { categoryId: "posting", categoryLabel: "블로그 포스팅", factId: "post_result", ask: "포스팅 성공/실패 대응", answer: "성공하면 축하 메시지가 뜨고, 혹시 실패해도 걱정 마세요! '다시 포스팅' 버튼으로 바로 재시도할 수 있어요 💪", keywords: ["성공", "실패", "재시도"] },
+    { categoryId: "error", categoryLabel: "오류 대응", factId: "safe_policy", ask: "안전 정책 차단 메시지", answer: "가끔 AI가 민감한 표현에 깜짝 놀랄 때가 있어요. 표현을 살짝 바꿔서 다시 해보면 잘 될 거예요 😊", keywords: ["안전정책", "차단", "표현완화"] },
+    { categoryId: "error", categoryLabel: "오류 대응", factId: "network_issue", ask: "네트워크 관련 오류", answer: "AI 글쓰기랑 포스팅은 인터넷이 필요해요! Wi-Fi나 데이터 연결 확인하고 다시 시도해보세요 📶", keywords: ["네트워크", "인터넷", "오류", "재시도", "와이파이"] },
+    { categoryId: "settings", categoryLabel: "설정 관리", factId: "settings_manage", ask: "계정 및 API 설정 변경", answer: "설정 화면에서 '계정 및 API 관리'로 들어가면 네이버 계정이랑 API 키를 언제든 바꿀 수 있어요 ⚙️", keywords: ["설정", "계정", "API", "변경", "수정"] },
+    { categoryId: "settings", categoryLabel: "설정 관리", factId: "settings_reset", ask: "초기 설정 다시 하기", answer: "처음부터 다시 하고 싶으면 '초기 설정 다시 하기'를 누르면 돼요. 깔끔하게 리셋! 🔄", keywords: ["초기설정", "리셋", "온보딩", "다시"] },
   ];
 
   const RAG_ANGLES = [
@@ -141,7 +143,7 @@
         "{CATEGORY}에서 {ASK} 기준이 뭐예요?",
         "{ASK} 핵심만 짧게 알려주세요.",
       ],
-      answerPhrases: ["안내 기준으로는", "기본 흐름은", "핵심만 요약하면", "가장 먼저 보면 좋은 건", "실행 기준은"],
+      answerPhrases: ["쉽게 말하면요,", "알려드릴게요!", "이렇게 하시면 돼요~", "포인트만 짚어드리면요,", "간단해요!"],
     },
     {
       key: "condition",
@@ -152,7 +154,7 @@
         "{ASK} 할 때 꼭 필요한 게 있어요?",
         "{ASK} 전제 조건 알려주세요.",
       ],
-      answerPhrases: ["조건을 기준으로 보면", "제한 관점에서 보면", "필수 조건은", "실무 기준으로는", "안정적으로 하려면"],
+      answerPhrases: ["이것만 기억하세요!", "꼭 알아두실 점은요,", "중요한 건요,", "체크 포인트는요,", "참고로 알려드리면요,"],
     },
     {
       key: "retry",
@@ -163,7 +165,7 @@
         "{ASK} 문제 생겼을 때 순서 알려주세요.",
         "{ASK} 막히면 어디부터 확인해요?",
       ],
-      answerPhrases: ["문제 상황에서는", "재시도 기준으로는", "복구 순서로는", "오류 대응 기준은", "막혔을 때는"],
+      answerPhrases: ["걱정 마세요!", "당황하지 마세요~", "이럴 땐요,", "해결 방법 알려드릴게요!", "금방 고칠 수 있어요!"],
     },
     {
       key: "quick",
@@ -174,7 +176,7 @@
         "{ASK} 지금 당장 뭐 하면 돼요?",
         "{ASK} 초보 기준으로 알려주세요.",
       ],
-      answerPhrases: ["짧게 말하면", "한 줄 요약은", "바로 실행 기준은", "초보자 기준으로는", "지금 바로 하려면"],
+      answerPhrases: ["한마디로요?", "초간단 정리!", "바로 알려드릴게요~", "딱 하나만 기억하세요!", "핵심만 콕!"],
     },
     {
       key: "confirm",
@@ -185,7 +187,7 @@
         "{ASK} 놓치기 쉬운 부분이 있을까요?",
         "{ASK} 마지막 확인사항 알려주세요.",
       ],
-      answerPhrases: ["확인 포인트는", "체크 기준으로는", "놓치기 쉬운 점까지 포함하면", "최종 확인은", "마무리 기준으로는"],
+      answerPhrases: ["다시 한번 정리하면요,", "놓치기 쉬운 건요,", "꼼꼼히 챙기면요,", "마지막으로 확인할 건요,", "정리해드릴게요!"],
     },
   ];
 
@@ -313,9 +315,9 @@
   }
   function createRagFallback(query) {
     if (isOutOfScopeQuery(query)) {
-      return "저는 MyDay 2.0 앱 사용 도우미예요. 앱 사용 관련 질문을 주시면 정확하게 안내해 드릴게요.";
+      return "앗, 그건 제 전문 분야가 아니에요~ 😆 저는 MyDay 앱 전문이거든요! 앱 관련 궁금한 거 있으시면 물어봐 주세요!";
     }
-    return "아직 제가 잘 모르는 부분이에요. 설정 화면이나 공식 안내를 확인해 주세요~";
+    return "음, 그건 저도 아직 잘 모르겠어요 😅 설정 화면이나 공식 안내를 한번 확인해 보시겠어요?";
   }
 
   /* ══════════════════════════════════════════
@@ -1494,22 +1496,63 @@
       if (ragChat.childElementCount > 0) return;
       addRagMessage(
         "bot",
-        "안녕하세요. 빠른도움 RAG 챗봇입니다. 앱 사용 질문을 입력하면 가장 가까운 의도로 답변해 드릴게요.",
+        "안녕하세요! 마이 도우미예요 😊 앱 사용 중 궁금한 점 편하게 물어봐 주세요~",
         `intent:${RAG_META.intentCount} · qa:${RAG_META.questionCount}`
       );
     }
-    function askRag(query) {
+    function getBackendUrl() {
+      try {
+        const stored = (localStorage.getItem("NAVER_BLOG_BACKEND_URL_MYDAY20") || "").trim().replace(/\/$/,"");
+        return stored || "https://ilsang-mooja-api-production.up.railway.app";
+      } catch { return "https://ilsang-mooja-api-production.up.railway.app"; }
+    }
+    function getGeminiApiKey() {
+      try {
+        const raw = localStorage.getItem("MYDAY20_SETUP_V1");
+        if (!raw) return "";
+        const parsed = JSON.parse(raw);
+        return (parsed.geminiApiKey || "").trim();
+      } catch { return ""; }
+    }
+    async function askServerRag(query) {
+      const url = getBackendUrl();
+      const apiKey = getGeminiApiKey();
+      const res = await fetch(`${url}/api/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query, geminiApiKey: apiKey }),
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!res.ok) throw new Error(`Server ${res.status}`);
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message || "Server error");
+      return data.answer;
+    }
+    async function askRag(query) {
       const q = String(query || "").trim();
       if (!q) return;
       addRagMessage("user", q);
 
       const intent = findBestRagIntent(q);
-      if (!intent) {
-        addRagMessage("bot", createRagFallback(q), "fallback");
+      if (intent) {
+        const answer = pickRagAnswer(intent, q);
+        addRagMessage("bot", answer, `${intent.categoryLabel} · ${intent.intent}`);
         return;
       }
-      const answer = pickRagAnswer(intent, q);
-      addRagMessage("bot", answer, `${intent.categoryLabel} · ${intent.intent}`);
+
+      // 로컬 매칭 실패 → 서버 RAG 호출
+      addRagMessage("bot", "잠시만요, 찾아볼게요... 🔍", "thinking");
+      try {
+        const serverAnswer = await askServerRag(q);
+        // thinking 메시지 제거
+        const lastMsg = ragChat.lastElementChild;
+        if (lastMsg && lastMsg.textContent.includes("잠시만요")) lastMsg.remove();
+        addRagMessage("bot", serverAnswer, "AI 답변");
+      } catch (e) {
+        const lastMsg = ragChat.lastElementChild;
+        if (lastMsg && lastMsg.textContent.includes("잠시만요")) lastMsg.remove();
+        addRagMessage("bot", createRagFallback(q), "fallback");
+      }
     }
     function submitRagQuery() {
       const q = ragInput.value.trim();

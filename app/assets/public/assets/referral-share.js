@@ -109,7 +109,7 @@
      - each intent has 5 questions + 5 answers
      ══════════════════════════════════════════ */
   const RAG_FACTS = [
-    { categoryId: "intro", categoryLabel: "앱 소개", factId: "what_is_app", ask: "이 앱은 뭐하는 앱", answer: "사진만 골라주면 AI가 감성 블로그 글을 뚝딱 써주고, 네이버 블로그에 바로 올려주는 앱이에요! 글쓰기는 귀찮은데 블로그는 하고 싶을 때 딱이죠 ✨", keywords: ["앱", "뭐하는", "소개", "어떤앱", "뭔가요", "뭐야", "뭐니", "무슨앱", "역할", "기능"] },
+    { categoryId: "intro", categoryLabel: "앱 소개", factId: "what_is_app", ask: "이 앱은 뭐하는 앱", answer: "사진만 골라주면 AI가 감성 블로그 글을 뚝딱 써주고, 네이버 블로그에 바로 올려주는 앱이에요! 글쓰기는 귀찮은데 블로그는 하고 싶을 때 딱이죠 ✨", keywords: ["이앱", "뭐하는앱", "소개", "어떤앱", "무슨앱", "앱역할", "앱기능"] },
     { categoryId: "intro", categoryLabel: "앱 소개", factId: "how_to_use", ask: "앱 사용 방법", answer: "사진 고르고 → 장소 선택 → 이유 선택 → 인물 입력하면 끝! AI가 알아서 감성글을 만들어줘요. 4단계면 블로그 한 편 완성이에요 😊", keywords: ["사용법", "어떻게", "쓰는법", "사용방법", "이용", "시작"] },
     { categoryId: "onboarding", categoryLabel: "온보딩/계정", factId: "first_setup", ask: "초기 설정 입력 항목", answer: "앱이랑 처음 인사하는 시간이에요! 네이버 아이디, 비밀번호, 블로그 아이디, Gemini API 키만 넣어주면 준비 끝이에요 🎉", keywords: ["초기설정", "온보딩", "입력", "계정", "처음"] },
     { categoryId: "onboarding", categoryLabel: "온보딩/계정", factId: "reopen_onboarding", ask: "온보딩 다시 보기", answer: "설정 화면에서 '온보딩 다시 보기'를 누르면 처음 그 설정 화면으로 돌아갈 수 있어요. 마치 타임머신처럼요 ⏰", keywords: ["온보딩", "다시", "초기설정"] },
@@ -1528,10 +1528,32 @@
       if (!data.success) throw new Error(data.message || "Server error");
       return data.answer;
     }
+    function isTermQuestion(query) {
+      const norm = normalizeText(query);
+      return /(.+)(이|가)\s*(뭐|무엇|무슨|어떤|뭔)/.test(norm)
+        || /(.+)(이란|이라는|이란게|뜻|의미|개념)/.test(norm)
+        || /^(뭐|무엇).*(이|가|란|야|예요|인가)/.test(norm);
+    }
     async function askRag(query) {
       const q = String(query || "").trim();
       if (!q) return;
       addRagMessage("user", q);
+
+      // 용어 질문("~이 뭐니", "~이란" 등)은 서버 RAG로 직행
+      if (isTermQuestion(q)) {
+        addRagMessage("bot", "잠시만요, 찾아볼게요... 🔍", "thinking");
+        try {
+          const serverAnswer = await askServerRag(q);
+          const lastMsg = ragChat.lastElementChild;
+          if (lastMsg && lastMsg.textContent.includes("잠시만요")) lastMsg.remove();
+          addRagMessage("bot", serverAnswer, "AI 답변");
+        } catch (e) {
+          const lastMsg = ragChat.lastElementChild;
+          if (lastMsg && lastMsg.textContent.includes("잠시만요")) lastMsg.remove();
+          addRagMessage("bot", createRagFallback(q), "fallback");
+        }
+        return;
+      }
 
       const intent = findBestRagIntent(q);
       if (intent) {

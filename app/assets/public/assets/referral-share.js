@@ -1964,11 +1964,42 @@
         `intent:${RAG_META.intentCount} · qa:${RAG_META.questionCount}`
       );
     }
+    const PROD_BACKEND_URL = "https://ilsang-mooja-api-production.up.railway.app";
+    function isNativeMobileRuntime() {
+      try {
+        const ua = (window.navigator && window.navigator.userAgent) || "";
+        const isMobileUa = /Android|iPhone|iPad|iPod/i.test(ua);
+        const cap = window.Capacitor;
+        const isNative = !!(cap && typeof cap.isNativePlatform === "function" && cap.isNativePlatform());
+        return isMobileUa || isNative;
+      } catch {
+        return false;
+      }
+    }
+    function isPrivateOrLocalBackend(url) {
+      return /^(?:https?:\/\/)?(?:(?:10|127)\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}|localhost)(:\d+)?(?:\/|$)/i.test(String(url || "").trim());
+    }
+    function isHttpsBackend(url) {
+      return /^https:\/\//i.test(String(url || "").trim());
+    }
+    function isHttpsTunnelBackend(url) {
+      return /^(?:https:\/\/)(?:[a-z0-9-]+\.)?(?:loca\.lt|ngrok\.io|trycloudflare\.com)(?:\/|$)/i.test(String(url || "").trim());
+    }
+    function normalizeBackendUrl(raw) {
+      const value = String(raw || "").trim().replace(/\/$/,"");
+      if (!value) return PROD_BACKEND_URL;
+      if (!isNativeMobileRuntime()) return value;
+      if (isHttpsTunnelBackend(value)) return value;
+      if (isHttpsBackend(value) && !isPrivateOrLocalBackend(value)) return value;
+      return PROD_BACKEND_URL;
+    }
     function getBackendUrl() {
       try {
-        const stored = (localStorage.getItem("NAVER_BLOG_BACKEND_URL_MYDAY20") || "").trim().replace(/\/$/,"");
-        return stored || "https://ilsang-mooja-api-production.up.railway.app";
-      } catch { return "https://ilsang-mooja-api-production.up.railway.app"; }
+        const stored = localStorage.getItem("NAVER_BLOG_BACKEND_URL_MYDAY20") || "";
+        return normalizeBackendUrl(stored);
+      } catch {
+        return PROD_BACKEND_URL;
+      }
     }
     function getGeminiApiKey() {
       try {

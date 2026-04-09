@@ -8,7 +8,6 @@
   const REFERRAL_KEY = "MYDAY20_REFERRAL_V1";
   const SETUP_KEY = "MYDAY20_SETUP_V1";
   const HISTORY_KEY = "MYDAY20_POST_HISTORY_V1";
-  const RECENT_POSTS_KEY = "MYDAY20_RECENT_POSTS_V1";
   const HISTORY_LIMIT = 20;
   const CARD_W = 1080;
   const CARD_H = 1350;
@@ -39,205 +38,17 @@
     saveReferral(ref);
     return ref;
   }
-  let setupCache = null;
-  let setupHydrationPromise = null;
-  let lastResolvedBlogUrl = "";
-  function getSecurePrefsPlugin() {
-    try {
-      const plugin = window.Capacitor?.Plugins?.SecurePrefs;
-      return plugin && typeof plugin.get === "function" ? plugin : null;
-    } catch { return null; }
-  }
-  async function readStoredString(key) {
-    const securePrefs = getSecurePrefsPlugin();
-    if (securePrefs) {
-      try {
-        const result = await securePrefs.get({ key });
-        if (result && typeof result.value === "string") {
-          try {
-            localStorage.setItem(key, result.value);
-          } catch {}
-          return result.value;
-        }
-      } catch {}
-    }
-    try {
-      return localStorage.getItem(key);
-    } catch {
-      return null;
-    }
-  }
-  function parseJson(raw, fallback) {
-    try { return JSON.parse(raw); }
-    catch { return fallback; }
-  }
-  function isObject(value) {
-    return !!value && typeof value === "object" && !Array.isArray(value);
-  }
-  function normalizeBlogId(value) {
-    const raw = String(value || "").trim();
-    if (!raw) return "";
-
-    const withProtocol = /^(?:m\.)?blog\.naver\.com\//i.test(raw) ? `https://${raw}` : raw;
-    try {
-      const parsedUrl = new URL(withProtocol);
-      if (/^(?:m\.)?blog\.naver\.com$/i.test(parsedUrl.hostname)) {
-        const queryBlogId = parsedUrl.searchParams.get("blogId");
-        if (queryBlogId) return decodeURIComponent(queryBlogId).trim();
-        const pathParts = parsedUrl.pathname.split("/").filter(Boolean);
-        const firstPart = pathParts[0] || "";
-        if (firstPart && !/^PostView\.naver$/i.test(firstPart)) {
-          return decodeURIComponent(firstPart).trim();
-        }
-      }
-    } catch {}
-
-    return raw
-      .replace(/^@/, "")
-      .replace(/[?#].*$/, "")
-      .replace(/\/.*$/, "")
-      .trim();
-  }
-  function buildBlogHomeUrl(blogId) {
-    const normalized = normalizeBlogId(blogId);
-    return normalized ? `https://blog.naver.com/${encodeURIComponent(normalized)}` : "";
-  }
-  function normalizeBlogUrl(value) {
-    const raw = String(value || "").trim();
-    if (!raw) return "";
-
-    const shortMatch = raw.match(/^https?:\/\/naver\.me\/[^\s"'<>]+/i);
-    if (shortMatch && shortMatch[0]) {
-      return shortMatch[0].replace(/[),.;]+$/, "");
-    }
-
-    const withProtocol = /^(?:m\.)?blog\.naver\.com\//i.test(raw) ? `https://${raw}` : raw;
-    const directMatch = withProtocol.match(/^https?:\/\/(?:m\.)?blog\.naver\.com\/[^\s"'<>]+/i);
-    if (directMatch && directMatch[0]) {
-      return directMatch[0].replace(/[),.;]+$/, "");
-    }
-
-    return buildBlogHomeUrl(raw);
-  }
-  function mergeSetupData(primary, secondary) {
-    const base = isObject(primary) ? primary : {};
-    const extra = isObject(secondary) ? secondary : {};
-    return { ...base, ...extra };
-  }
-  function readSetupFromLocal() {
-    const parsed = parseJson(localStorage.getItem(SETUP_KEY), {});
-    return isObject(parsed) ? parsed : {};
-  }
-  async function hydrateSetupCache(force) {
-    if (!force && setupHydrationPromise) return setupHydrationPromise;
-    if (!force && setupCache) return setupCache;
-
-    setupHydrationPromise = (async () => {
-      const localSetup = readSetupFromLocal();
-      const raw = await readStoredString(SETUP_KEY);
-      const storedSetup = isObject(parseJson(raw, {})) ? parseJson(raw, {}) : {};
-      setupCache = mergeSetupData(localSetup, storedSetup);
-      try {
-        localStorage.setItem(SETUP_KEY, JSON.stringify(setupCache));
-      } catch {}
-      return setupCache;
-    })();
-
-    try {
-      return await setupHydrationPromise;
-    } finally {
-      setupHydrationPromise = null;
-    }
-  }
-  function getSetupSnapshot() {
-    if (setupCache && isObject(setupCache)) return setupCache;
-    const localSetup = readSetupFromLocal();
-    setupCache = localSetup;
-    return localSetup;
-  }
-  function extractBlogIdFromSetup(setup) {
-    const source = isObject(setup) ? setup : {};
-    const candidates = [
-      source.naverBlogId,
-      source.blogId,
-      source.blog_id,
-      source.naverBlogUrl,
-      source.blogUrl,
-      source.blogURL,
-      source.blog,
-      source.url,
-    ];
-    for (const candidate of candidates) {
-      const normalized = normalizeBlogId(candidate);
-      if (normalized) return normalized;
-    }
-    return "";
-  }
-  function extractBlogUrlFromSetup(setup) {
-    const source = isObject(setup) ? setup : {};
-    const candidates = [
-      source.naverBlogUrl,
-      source.blogUrl,
-      source.blogURL,
-      source.url,
-    ];
-    for (const candidate of candidates) {
-      const normalized = normalizeBlogUrl(candidate);
-      if (normalized) return normalized;
-    }
-    return buildBlogHomeUrl(extractBlogIdFromSetup(source));
-  }
-  function rememberBlogUrl(url) {
-    const normalized = normalizeBlogUrl(url);
-    if (!normalized) return "";
-    lastResolvedBlogUrl = normalized;
-    if (lastPublishData) {
-      lastPublishData = { ...lastPublishData, blogUrl: normalized };
-    }
-    return normalized;
-  }
   function getBlogId() {
-    return extractBlogIdFromSetup(getSetupSnapshot());
-  }
-  function parseHistoryItems(raw) {
-    if (!Array.isArray(raw)) return [];
-    return raw.map((item) => {
-      const row = isObject(item) ? item : {};
-      return {
-        ...row,
-        title: String(row.title || row.postTitle || "").trim() || "MyDay 포스팅",
-        blogUrl: normalizeBlogUrl(row.blogUrl || row.url || row.postUrl || row.link),
-        elapsed: Number(row.elapsed || row.durationSeconds || 0) || 0,
-        imgCount: Number(row.imgCount || row.imageCount || 0) || 0,
-        createdAt: String(row.createdAt || row.publishedAt || row.updatedAt || "").trim(),
-      };
-    }).filter((item) => item.blogUrl || item.createdAt || item.title);
+    try {
+      const s = JSON.parse(localStorage.getItem(SETUP_KEY)) || {};
+      return (s.naverBlogId || "").trim();
+    } catch { return ""; }
   }
   function loadHistory() {
-    const merged = [];
-    const seen = new Set();
-    for (const key of [HISTORY_KEY, RECENT_POSTS_KEY]) {
-      const items = parseHistoryItems(parseJson(localStorage.getItem(key), []));
-      for (const item of items) {
-        const dedupeKey = `${item.title}|${item.blogUrl}|${item.createdAt}`;
-        if (seen.has(dedupeKey)) continue;
-        seen.add(dedupeKey);
-        merged.push(item);
-      }
-    }
-    return merged.sort((a, b) => {
-      const aTime = Date.parse(a.createdAt || "") || 0;
-      const bTime = Date.parse(b.createdAt || "") || 0;
-      return bTime - aTime;
-    });
-  }
-  function getLatestHistoryBlogUrl() {
-    const items = loadHistory();
-    for (const item of items) {
-      const url = normalizeBlogUrl(item && item.blogUrl ? item.blogUrl : "");
-      if (url) return url;
-    }
-    return "";
+    try {
+      const raw = JSON.parse(localStorage.getItem(HISTORY_KEY)) || [];
+      return Array.isArray(raw) ? raw : [];
+    } catch { return []; }
   }
   function saveHistory(items) {
     localStorage.setItem(HISTORY_KEY, JSON.stringify(items));
@@ -271,35 +82,15 @@
     } catch { return ""; }
   }
   function findBlogUrlFromDom(blogId) {
-    const anchors = document.querySelectorAll('a[href*="blog.naver.com"], a[href*="naver.me"]');
+    const anchors = document.querySelectorAll('a[href*="blog.naver.com"]');
     for (const a of anchors) {
-      const text = String(a.textContent || "").trim();
-      const href = normalizeBlogUrl(a.href || a.getAttribute("href") || "");
-      if (text.includes("보러가기") && href) return href;
-    }
-    for (const a of anchors) {
-      const href = normalizeBlogUrl(a.href || a.getAttribute("href") || "");
-      if (href) return href;
+      const href = (a.getAttribute("href") || "").trim();
+      if (/^https?:\/\/blog\.naver\.com\/\S+/i.test(href)) return href;
     }
     const bodyText = document.body.innerText || "";
-    const m = bodyText.match(/https?:\/\/(?:m\.)?blog\.naver\.com\/\S+/i);
-    if (m && m[0]) return normalizeBlogUrl(m[0]);
-    return buildBlogHomeUrl(blogId);
-  }
-  async function resolveBlogUrl() {
-    await hydrateSetupCache(true);
-    const blogId = getBlogId();
-    const setupUrl = extractBlogUrlFromSetup(getSetupSnapshot());
-    const domUrl = findBlogUrlFromDom(blogId);
-    if (domUrl) return rememberBlogUrl(domUrl);
-    if (setupUrl) return rememberBlogUrl(setupUrl);
-    const recentUrl = normalizeBlogUrl(lastPublishData && lastPublishData.blogUrl ? lastPublishData.blogUrl : "");
-    if (recentUrl) return rememberBlogUrl(recentUrl);
-    if (lastResolvedBlogUrl) return lastResolvedBlogUrl;
-    const historyUrl = getLatestHistoryBlogUrl();
-    if (historyUrl) return rememberBlogUrl(historyUrl);
-    if (blogId) return rememberBlogUrl(buildBlogHomeUrl(blogId));
-    return "";
+    const m = bodyText.match(/https?:\/\/blog\.naver\.com\/\S+/i);
+    if (m && m[0]) return m[0].replace(/[),.;]+$/, "");
+    return blogId ? `https://blog.naver.com/${blogId}` : "";
   }
   function findPostTitleFromDom() {
     const h1s = document.querySelectorAll("h1, h2, [class*='title']");
@@ -341,50 +132,6 @@
     { categoryId: "settings", categoryLabel: "설정 관리", factId: "settings_manage", ask: "계정 및 API 설정 변경", answer: "설정 화면에서 '계정 및 API 관리'로 들어가면 네이버 계정이랑 API 키를 언제든 바꿀 수 있어요 ⚙️", keywords: ["설정", "계정", "API", "변경", "수정"] },
     { categoryId: "settings", categoryLabel: "설정 관리", factId: "settings_reset", ask: "초기 설정 다시 하기", answer: "처음부터 다시 하고 싶으면 '초기 설정 다시 하기'를 누르면 돼요. 깔끔하게 리셋! 🔄", keywords: ["초기설정", "리셋", "온보딩", "다시"] },
   ];
-  const APP_TERM_GLOSSARY = [
-    { term: "온보딩", aliases: ["초기 설정", "onboarding"], answer: "온보딩은 앱을 처음 쓸 때 계정과 API 정보를 연결하는 첫 설정 단계예요." },
-    { term: "초기 설정", aliases: ["첫 설정", "온보딩"], answer: "초기 설정은 네이버 계정/블로그 아이디/Gemini API 키를 처음 등록하는 단계예요." },
-    { term: "온보딩 다시 보기", aliases: ["온보딩 다시", "초기 설정 화면"], answer: "온보딩 다시 보기는 처음 설정 화면을 다시 열어 값을 점검하거나 수정할 때 쓰는 기능이에요." },
-    { term: "계정 및 API 관리", aliases: ["계정 api 관리", "설정 관리"], answer: "계정 및 API 관리는 네이버 계정과 Gemini API 키를 수정/저장하는 설정 메뉴예요." },
-    { term: "네이버 아이디", aliases: ["네이버 계정", "naver id"], answer: "네이버 아이디는 블로그 발행 로그인에 사용하는 네이버 계정 ID예요." },
-    { term: "네이버 비밀번호", aliases: ["naver password"], answer: "네이버 비밀번호는 네이버 로그인 인증에 필요한 비밀번호예요." },
-    { term: "블로그 아이디", aliases: ["네이버 블로그 아이디", "blog id"], answer: "블로그 아이디는 blog.naver.com/xxxxx 형태에서 xxxxx에 해당하는 값이에요." },
-    { term: "Gemini", aliases: ["지미니", "gemini ai"], answer: "Gemini는 글 생성에 사용하는 Google의 AI 모델이에요." },
-    { term: "Gemini API 키", aliases: ["api 키", "api key", "apikey", "gemini key"], answer: "Gemini API 키는 AI 글 생성 요청을 인증하는 키이고, Google AI Studio에서 발급받아요." },
-    { term: "사용량", aliases: ["api 사용량", "쿼터", "quota"], answer: "사용량은 Gemini API를 하루에 호출할 수 있는 한도예요. 초과하면 잠시 후 재시도하면 돼요." },
-    { term: "안전 정책", aliases: ["정책 차단", "safety policy"], answer: "안전 정책은 민감하거나 위험한 표현을 자동으로 제한하는 AI 안전 필터예요." },
-    { term: "사진 추가", aliases: ["사진 업로드", "이미지 업로드"], answer: "사진 추가는 포스팅에 쓸 이미지를 넣는 단계이고 1장~10장까지 선택할 수 있어요." },
-    { term: "확인 버튼", aliases: ["확인", "확인 완료"], answer: "확인 버튼은 사진 선택을 확정해서 다음 단계로 진행시키는 버튼이에요." },
-    { term: "복수선택", aliases: ["여러 개 선택", "멀티 선택"], answer: "복수선택은 장소/이유처럼 항목을 여러 개 동시에 고를 수 있다는 뜻이에요." },
-    { term: "기타 직접 입력", aliases: ["기타", "직접 입력"], answer: "기타 직접 입력은 목록에 없는 장소/이유를 사용자가 자유롭게 입력하는 기능이에요." },
-    { term: "장소", aliases: ["장소 선택"], answer: "장소는 사진을 찍은 공간 정보예요. 글 분위기와 문맥에 반영돼요." },
-    { term: "이유", aliases: ["이유 선택"], answer: "이유는 사진을 찍은 목적/상황 정보예요. AI가 글 톤을 맞출 때 사용해요." },
-    { term: "인물", aliases: ["사진 속 인물"], answer: "인물은 사진에 나온 사람 정보를 적는 항목이고, 선택사항이라 비워도 돼요." },
-    { term: "AI 글 생성", aliases: ["글 생성", "자동 생성"], answer: "AI 글 생성은 입력한 사진/장소/이유/인물을 바탕으로 본문을 자동 작성하는 기능이에요." },
-    { term: "포스팅 글 새로 생성하기", aliases: ["글 재생성", "재생성"], answer: "포스팅 글 새로 생성하기는 같은 입력으로 다른 스타일의 글을 다시 만들어 주는 기능이에요." },
-    { term: "포스팅 본문", aliases: ["본문", "본문 수정"], answer: "포스팅 본문은 최종 발행 전에 확인/수정하는 글 본문 영역이에요." },
-    { term: "섹션", aliases: ["소제목", "단락"], answer: "섹션은 본문을 나누는 글 묶음 단위예요. 주제별로 읽기 쉽게 구성돼요." },
-    { term: "글자수", aliases: ["총 글자수"], answer: "글자수는 생성된 본문의 전체 문자 길이예요." },
-    { term: "해시태그", aliases: ["태그"], answer: "해시태그는 글 주제를 요약해 검색/분류에 쓰는 #키워드예요." },
-    { term: "포스팅", aliases: ["블로그 포스팅", "발행"], answer: "포스팅은 완성된 글과 이미지를 네이버 블로그에 게시하는 작업이에요." },
-    { term: "자동 포스팅", aliases: ["네이버 자동 포스팅", "자동 발행"], answer: "자동 포스팅은 앱이 로그인부터 글/이미지 업로드까지 자동으로 진행하는 발행 방식이에요." },
-    { term: "네이버 블로그 자동 포스팅 실행", aliases: ["자동 포스팅 실행", "포스팅 실행"], answer: "이 버튼을 누르면 AI가 만든 결과를 네이버 블로그에 실제로 발행해요." },
-    { term: "포스팅 기록", aliases: ["기록"], answer: "포스팅 기록은 완료된 발행 결과(제목/시간/링크)를 다시 확인하는 목록이에요." },
-    { term: "공유카드", aliases: ["공유 카드", "이미지 복사"], answer: "공유카드는 최근 포스팅 내용을 세로 이미지로 만들어 SNS에 붙여넣기 쉽게 해주는 기능이에요." },
-    { term: "오늘의 철학", aliases: ["철학", "명언", "철학자 명언 이미지"], answer: "오늘의 철학은 앱 상단에 보여주는 철학자 명언/문구 영역이에요." },
-    { term: "슬로건", aliases: ["내 하루를 빛나게"], answer: "슬로건은 앱이 전달하려는 핵심 한 줄 메시지예요." },
-    { term: "백엔드 서버 주소", aliases: ["서버 주소", "backend url"], answer: "백엔드 서버 주소는 앱이 API 요청을 보낼 서버 URL 설정값이에요." },
-    { term: "초기 설정 다시 하기", aliases: ["처음부터 다시"], answer: "초기 설정 다시 하기는 저장된 설정을 지우고 첫 설정 흐름으로 되돌리는 기능이에요." },
-    { term: "설정 초기화", aliases: ["설정 리셋"], answer: "설정 초기화는 저장된 계정/API 설정 값을 비우는 기능이에요." },
-    { term: "네트워크", aliases: ["인터넷 연결"], answer: "네트워크는 AI 글 생성/포스팅 발행에 필요한 인터넷 연결 상태를 뜻해요." },
-    { term: "공휴일", aliases: ["휴일"], answer: "공휴일은 AI가 글 문맥을 만들 때 참고하는 날짜 정보예요." },
-    { term: "절기", aliases: ["입춘", "춘분", "하지", "추분", "동지"], answer: "절기는 계절 흐름을 나타내는 시기 정보로, 문장 분위기 반영에 쓰여요." },
-  ];
-  const APP_TERM_STOPWORDS = new Set([
-    "앱", "화면", "질문", "도움", "설명", "설정", "열기", "닫기", "전송",
-    "저장", "시작", "실행", "완료", "다시", "하기", "버튼", "선택", "입력",
-    "가능", "중", "약", "총", "개", "기준", "그리고", "또", "지금", "바로",
-  ]);
 
   const RAG_ANGLES = [
     {
@@ -476,193 +223,9 @@
     }
     return Math.abs(h);
   }
-  function compactText(text) {
-    return normalizeText(text).replace(/\s+/g, "");
-  }
-  function stripKoreanTail(text) {
-    let out = String(text || "");
-    if (!out) return "";
-    const tails = [
-      "으로는", "인가요", "이란게", "이라는게", "이었다", "이었다면", "이라는", "이라는지",
-      "이란", "인가", "예요", "이에요", "입니다", "이야", "라고", "이라", "으로", "에서",
-      "부터", "까지", "에게", "한테", "이랑", "이", "가", "은", "는", "을", "를", "의",
-      "도", "만", "와", "과", "로", "에", "란", "야",
-    ];
-    let changed = true;
-    while (changed) {
-      changed = false;
-      for (const tail of tails) {
-        if (out.length > tail.length + 1 && out.endsWith(tail)) {
-          out = out.slice(0, -tail.length);
-          changed = true;
-          break;
-        }
-      }
-    }
-    return out;
-  }
-  function bigramSimilarity(a, b) {
-    const ag = makeBigrams(a);
-    const bg = makeBigrams(b);
-    if (!ag.size || !bg.size) return 0;
-    let hit = 0;
-    for (const gram of ag) {
-      if (bg.has(gram)) hit += 1;
-    }
-    return hit / Math.max(ag.size, bg.size);
-  }
-  function termToFactId(term, idx) {
-    const slug = normalizeText(term).replace(/\s+/g, "_").replace(/[^0-9a-z가-힣_]/g, "").slice(0, 48);
-    return slug || `term_${idx + 1}`;
-  }
-  function splitTermCandidates(text) {
-    const src = String(text || "").replace(/\s+/g, " ").trim();
-    if (!src) return [];
-    const chunks = src
-      .replace(/[“”"'`]/g, " ")
-      .replace(/[?!,:;~]/g, " ")
-      .split(/[|/()\[\]\n]+/)
-      .map((part) => part.trim())
-      .filter(Boolean);
-    const out = [];
-    for (const chunk of chunks) {
-      if (chunk.length >= 2 && chunk.length <= 24) out.push(chunk);
-      const words = chunk.split(" ").map((w) => w.trim()).filter(Boolean);
-      if (words.length >= 2 && words.length <= 4 && chunk.length <= 24) out.push(words.join(" "));
-      for (const w of words) {
-        if (w.length >= 2 && w.length <= 16) out.push(w);
-      }
-    }
-    return out;
-  }
-  function isValidAppTerm(term) {
-    const norm = normalizeText(term);
-    if (!norm) return false;
-    if (norm.length < 2 || norm.length > 24) return false;
-    if (APP_TERM_STOPWORDS.has(norm)) return false;
-    if (!/[0-9a-z가-힣]/.test(norm)) return false;
-    if (/^[0-9]+$/.test(norm)) return false;
-    return true;
-  }
-  function extractUiTerms() {
-    if (typeof document === "undefined") return [];
-    const selector = "button, h1, h2, h3, h4, label, [role='button'], input[placeholder], textarea[placeholder], .myday-nav-label";
-    const nodes = document.querySelectorAll(selector);
-    const terms = [];
-    for (const node of nodes) {
-      if (!node) continue;
-      const text = (node.getAttribute("placeholder") || node.innerText || node.textContent || "").trim();
-      if (!text) continue;
-      terms.push(...splitTermCandidates(text));
-    }
-    return uniqueList(terms.filter(isValidAppTerm));
-  }
-  function makeTermRow(term, answer, aliases, source) {
-    const normSet = new Set();
-    const compactSet = new Set();
-    const all = uniqueList([term, ...(aliases || [])]);
-    for (const text of all) {
-      const norm = normalizeText(text);
-      if (!norm || norm.length < 2) continue;
-      normSet.add(norm);
-      const compact = compactText(text);
-      if (compact.length >= 2) {
-        compactSet.add(compact);
-        const stripped = stripKoreanTail(compact);
-        if (stripped.length >= 2) compactSet.add(stripped);
-      }
-    }
-    return {
-      term,
-      answer: String(answer || "").trim(),
-      source,
-      aliasNorms: Array.from(normSet),
-      aliasCompacts: Array.from(compactSet),
-    };
-  }
-  let APP_TERM_ROWS_CACHE = null;
-  function buildAppTermRows() {
-    const rows = [];
-    const aliasMap = new Map();
-    const addRow = (row) => {
-      if (!row || !row.aliasCompacts.length) return;
-      const duplicated = row.aliasCompacts.some((k) => aliasMap.has(k));
-      if (duplicated) return;
-      rows.push(row);
-      row.aliasCompacts.forEach((k) => aliasMap.set(k, row.term));
-    };
-
-    for (const item of APP_TERM_GLOSSARY) {
-      addRow(makeTermRow(item.term, item.answer, item.aliases || [], "glossary"));
-    }
-    for (const fact of RAG_FACTS) {
-      const candidates = uniqueList([fact.ask, fact.categoryLabel, ...(fact.keywords || [])]);
-      for (const term of candidates) {
-        if (!isValidAppTerm(term)) continue;
-        addRow(makeTermRow(term, "", [], "faq"));
-      }
-    }
-    const uiTerms = extractUiTerms();
-    for (const term of uiTerms) {
-      addRow(makeTermRow(term, "", [], "ui"));
-    }
-    return rows;
-  }
-  function refreshAppTermRows() {
-    APP_TERM_ROWS_CACHE = null;
-  }
-  function getAppTermRows() {
-    if (!APP_TERM_ROWS_CACHE) {
-      APP_TERM_ROWS_CACHE = buildAppTermRows();
-    }
-    return APP_TERM_ROWS_CACHE;
-  }
-  function detectAppTerm(query) {
-    const qNorm = normalizeText(query);
-    const qCompact = compactText(query);
-    const qCore = stripKoreanTail(qCompact);
-    if (!qNorm || !qCompact) return null;
-    let best = null;
-
-    for (const row of getAppTermRows()) {
-      let score = 0;
-      for (const norm of row.aliasNorms) {
-        if (qNorm === norm) score = Math.max(score, 130);
-        else if (qNorm.includes(norm)) score = Math.max(score, 96 + Math.min(18, norm.length));
-      }
-      for (const compact of row.aliasCompacts) {
-        if (qCompact === compact || qCore === compact) score = Math.max(score, 144);
-        else if (qCompact.includes(compact) || qCore.includes(compact)) score = Math.max(score, 112 + Math.min(18, compact.length));
-        else if (compact.length >= 3 && qCore.length >= 3) {
-          const sim = bigramSimilarity(qCore, compact);
-          if (sim >= 0.84) score = Math.max(score, 92 + Math.round(sim * 20));
-        }
-      }
-      if (!best || score > best.score || (score === best.score && row.term.length > best.row.term.length)) {
-        best = { row, score };
-      }
-    }
-    if (!best || best.score < 98) return null;
-    return best.row;
-  }
-  function createTermFallback(termRow) {
-    if (termRow && termRow.answer) return termRow.answer;
-    return "";
-  }
-  function buildGlossaryFacts() {
-    return APP_TERM_GLOSSARY.map((item, idx) => ({
-      categoryId: "glossary",
-      categoryLabel: "앱 용어",
-      factId: termToFactId(item.term, idx),
-      ask: `${item.term} 뜻`,
-      answer: item.answer,
-      keywords: uniqueList([item.term, ...(item.aliases || []), "용어", "뜻", "의미", "개념"]),
-    }));
-  }
   function buildRagFaqDataset() {
     const rows = [];
-    const sourceFacts = [...RAG_FACTS, ...buildGlossaryFacts()];
-    for (const fact of sourceFacts) {
+    for (const fact of RAG_FACTS) {
       for (const angle of RAG_ANGLES) {
         const questions = angle.questionTemplates.map((tpl) => (
           tpl
@@ -751,12 +314,6 @@
     return intent.answers[idx];
   }
   function createRagFallback(query) {
-    const termHit = detectAppTerm(query);
-    if (termHit) {
-      const msg = createTermFallback(termHit);
-      if (msg) return msg;
-      return `'${termHit.term}'은 MyDay 앱 화면에 보이는 용어예요. 네트워크가 안정되면 같은 질문을 한 번 더 보내주시면 더 정확한 설명을 바로 가져올게요.`;
-    }
     if (isOutOfScopeQuery(query)) {
       return "앗, 그건 제 전문 분야가 아니에요~ 😆 저는 MyDay 앱 전문이거든요! 앱 관련 궁금한 거 있으시면 물어봐 주세요!";
     }
@@ -906,24 +463,6 @@
     if (!doc) return;
     lastGeneratedBlogDoc = { ...doc, source: "api" };
   }
-  function capturePublishResponse(url, responseText) {
-    if (!/\/api\/publish(?:-async)?/i.test(String(url || ""))) return;
-    const parsed = parseJson(responseText, null);
-    if (!isObject(parsed)) return;
-
-    const candidates = [
-      parsed.url,
-      parsed.blogUrl,
-      parsed.data && parsed.data.url,
-      parsed.data && parsed.data.blogUrl,
-    ];
-    for (const candidate of candidates) {
-      const normalized = normalizeBlogUrl(candidate);
-      if (!normalized) continue;
-      rememberBlogUrl(normalized);
-      return;
-    }
-  }
   function installBlogCaptureHooks() {
     if (blogCaptureHookInstalled) return;
     blogCaptureHookInstalled = true;
@@ -943,9 +482,6 @@
         this.addEventListener("load", () => {
           try {
             captureBlogFromPayload(this.__mydayUrl || "", this.responseText || "");
-          } catch {}
-          try {
-            capturePublishResponse(this.__mydayUrl || "", this.responseText || "");
           } catch {}
         });
         return originalSend.apply(this, args);
@@ -973,11 +509,6 @@
           if (/\/api\/generate-blog/i.test(url)) {
             res.clone().text().then((txt) => {
               captureBlogFromPayload(url, txt);
-            }).catch(() => {});
-          }
-          if (/\/api\/publish(?:-async)?/i.test(url)) {
-            res.clone().text().then((txt) => {
-              capturePublishResponse(url, txt);
             }).catch(() => {});
           }
         } catch {}
@@ -1118,7 +649,7 @@
         successLatched = true;
         const elapsed = publishStartTime ? Math.round((Date.now() - publishStartTime) / 1000) : 0;
         const blogId = getBlogId();
-        const blogUrl = rememberBlogUrl(findBlogUrlFromDom(blogId));
+        const blogUrl = findBlogUrlFromDom(blogId);
 
         /* Try to find image count from DOM */
         const imgEls = document.querySelectorAll('img[src^="data:image"]');
@@ -1756,7 +1287,7 @@
     const helpOverlay = document.createElement("div");
     helpOverlay.className = "myday-share-overlay";
     const helpModal = document.createElement("div");
-    helpModal.className = "myday-share-modal myday-help-modal";
+    helpModal.className = "myday-share-modal";
     const helpHeader = document.createElement("div");
     helpHeader.className = "myday-share-modal-header";
     helpHeader.innerHTML = "<h2>빠른 도움</h2>";
@@ -1766,6 +1297,12 @@
     helpHeader.appendChild(helpCloseBtn);
     const helpBody = document.createElement("div");
     helpBody.className = "myday-share-modal-body";
+
+    const ragIntro = document.createElement("div");
+    ragIntro.className = "myday-rag-intro";
+    ragIntro.innerHTML = `
+      <div class="myday-rag-badge">RAG FAQ · ${RAG_META.intentCount} Intent · ${RAG_META.questionCount}Q</div>
+      <div class="myday-share-hint">질문 표현이 달라도 자동으로 가장 가까운 의도를 찾아 답해요.</div>`;
 
     const ragQuick = document.createElement("div");
     ragQuick.className = "myday-rag-quick";
@@ -1814,6 +1351,7 @@
     helpHint.textContent = "앱과 무관한 질문은 답변하지 않아요.";
     helpActions.appendChild(helpHint);
 
+    helpBody.appendChild(ragIntro);
     helpBody.appendChild(ragQuick);
     helpBody.appendChild(ragChat);
     helpBody.appendChild(ragInputWrap);
@@ -1828,7 +1366,6 @@
     root.appendChild(helpOverlay);
     document.body.appendChild(root);
     document.body.classList.add("myday-has-bottom-nav");
-    refreshAppTermRows();
 
     /* ── Events ── */
     let openPane = "";
@@ -1956,7 +1493,6 @@
       scrollRagToBottom();
     }
     function ensureRagWelcome() {
-      refreshAppTermRows();
       if (ragChat.childElementCount > 0) return;
       addRagMessage(
         "bot",
@@ -1964,42 +1500,11 @@
         `intent:${RAG_META.intentCount} · qa:${RAG_META.questionCount}`
       );
     }
-    const PROD_BACKEND_URL = "https://ilsang-mooja-api-production.up.railway.app";
-    function isNativeMobileRuntime() {
-      try {
-        const ua = (window.navigator && window.navigator.userAgent) || "";
-        const isMobileUa = /Android|iPhone|iPad|iPod/i.test(ua);
-        const cap = window.Capacitor;
-        const isNative = !!(cap && typeof cap.isNativePlatform === "function" && cap.isNativePlatform());
-        return isMobileUa || isNative;
-      } catch {
-        return false;
-      }
-    }
-    function isPrivateOrLocalBackend(url) {
-      return /^(?:https?:\/\/)?(?:(?:10|127)\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}|localhost)(:\d+)?(?:\/|$)/i.test(String(url || "").trim());
-    }
-    function isHttpsBackend(url) {
-      return /^https:\/\//i.test(String(url || "").trim());
-    }
-    function isHttpsTunnelBackend(url) {
-      return /^(?:https:\/\/)(?:[a-z0-9-]+\.)?(?:loca\.lt|ngrok\.io|trycloudflare\.com)(?:\/|$)/i.test(String(url || "").trim());
-    }
-    function normalizeBackendUrl(raw) {
-      const value = String(raw || "").trim().replace(/\/$/,"");
-      if (!value) return PROD_BACKEND_URL;
-      if (!isNativeMobileRuntime()) return value;
-      if (isHttpsTunnelBackend(value)) return value;
-      if (isHttpsBackend(value) && !isPrivateOrLocalBackend(value)) return value;
-      return PROD_BACKEND_URL;
-    }
     function getBackendUrl() {
       try {
-        const stored = localStorage.getItem("NAVER_BLOG_BACKEND_URL_MYDAY20") || "";
-        return normalizeBackendUrl(stored);
-      } catch {
-        return PROD_BACKEND_URL;
-      }
+        const stored = (localStorage.getItem("NAVER_BLOG_BACKEND_URL_MYDAY20") || "").trim().replace(/\/$/,"");
+        return stored || "https://ilsang-mooja-api-production.up.railway.app";
+      } catch { return "https://ilsang-mooja-api-production.up.railway.app"; }
     }
     function getGeminiApiKey() {
       try {
@@ -2023,25 +1528,8 @@
       if (!data.success) throw new Error(data.message || "Server error");
       return data.answer;
     }
-    function removeThinkingMessage() {
-      const lastMsg = ragChat.lastElementChild;
-      if (lastMsg && lastMsg.textContent.includes("잠시만요")) lastMsg.remove();
-    }
-    async function askServerRagWithThinking(query) {
-      addRagMessage("bot", "잠시만요, 찾아볼게요... 🔍", "thinking");
-      try {
-        const serverAnswer = await askServerRag(query);
-        removeThinkingMessage();
-        addRagMessage("bot", serverAnswer, "AI 답변");
-      } catch (e) {
-        removeThinkingMessage();
-        addRagMessage("bot", createRagFallback(query), "fallback");
-      }
-    }
     function isTermQuestion(query) {
       const norm = normalizeText(query);
-      if (!norm) return false;
-      if (detectAppTerm(query)) return true;
       return /(.+)(이|가)\s*(뭐|무엇|무슨|어떤|뭔)/.test(norm)
         || /(.+)(이란|이라는|이란게|뜻|의미|개념)/.test(norm)
         || /^(뭐|무엇).*(이|가|란|야|예요|인가)/.test(norm);
@@ -2051,24 +1539,19 @@
       if (!q) return;
       addRagMessage("user", q);
 
-      const termHit = detectAppTerm(q);
-      if (termHit) {
-        const termIntent = findBestRagIntent(`${termHit.term} 뜻`);
-        if (termIntent && termIntent.categoryId === "glossary") {
-          const termAnswer = pickRagAnswer(termIntent, q);
-          addRagMessage("bot", termAnswer, `용어사전 · ${termHit.term}`);
-          return;
-        }
-        const fallback = createTermFallback(termHit);
-        if (fallback) {
-          addRagMessage("bot", fallback, `용어사전 · ${termHit.term}`);
-          return;
-        }
-      }
-
       // 용어 질문("~이 뭐니", "~이란" 등)은 서버 RAG로 직행
       if (isTermQuestion(q)) {
-        await askServerRagWithThinking(q);
+        addRagMessage("bot", "잠시만요, 찾아볼게요... 🔍", "thinking");
+        try {
+          const serverAnswer = await askServerRag(q);
+          const lastMsg = ragChat.lastElementChild;
+          if (lastMsg && lastMsg.textContent.includes("잠시만요")) lastMsg.remove();
+          addRagMessage("bot", serverAnswer, "AI 답변");
+        } catch (e) {
+          const lastMsg = ragChat.lastElementChild;
+          if (lastMsg && lastMsg.textContent.includes("잠시만요")) lastMsg.remove();
+          addRagMessage("bot", createRagFallback(q), "fallback");
+        }
         return;
       }
 
@@ -2080,7 +1563,18 @@
       }
 
       // 로컬 매칭 실패 → 서버 RAG 호출
-      await askServerRagWithThinking(q);
+      addRagMessage("bot", "잠시만요, 찾아볼게요... 🔍", "thinking");
+      try {
+        const serverAnswer = await askServerRag(q);
+        // thinking 메시지 제거
+        const lastMsg = ragChat.lastElementChild;
+        if (lastMsg && lastMsg.textContent.includes("잠시만요")) lastMsg.remove();
+        addRagMessage("bot", serverAnswer, "AI 답변");
+      } catch (e) {
+        const lastMsg = ragChat.lastElementChild;
+        if (lastMsg && lastMsg.textContent.includes("잠시만요")) lastMsg.remove();
+        addRagMessage("bot", createRagFallback(q), "fallback");
+      }
     }
     function submitRagQuery() {
       const q = ragInput.value.trim();
@@ -2088,13 +1582,9 @@
       ragInput.value = "";
       askRag(q);
     }
-    function showServicePreparingPopup() {
-      closeAll();
-      window.alert("서비스 준비 중입니다.\n완성되면 더 좋은 서비스로 찾아 뵙겠습니다.\n감사합니다");
-    }
 
-    shareBtn.addEventListener("click", showServicePreparingPopup);
-    historyBtn.addEventListener("click", showServicePreparingPopup);
+    shareBtn.addEventListener("click", () => togglePane("share"));
+    historyBtn.addEventListener("click", () => togglePane("history"));
     helpBtn.addEventListener("click", () => togglePane("help"));
     closeBtn.addEventListener("click", closeAll);
     historyCloseBtn.addEventListener("click", closeAll);
@@ -2130,17 +1620,18 @@
       item.btn.addEventListener("click", () => askRag(item.q));
     }
     openBlogBtn.addEventListener("click", () => {
-      resolveBlogUrl().then((blogUrl) => {
-        if (!blogUrl) {
-          alert("블로그 아이디가 아직 설정되지 않았어요.");
-          return;
-        }
-        window.open(blogUrl, "_blank", "noopener,noreferrer");
-      }).catch(() => {
-        alert("내 블로그 주소를 확인하는 중 문제가 발생했어요. 잠시 후 다시 시도해 주세요.");
-      });
+      const blogId = getBlogId();
+      if (!blogId) {
+        alert("블로그 아이디가 아직 설정되지 않았어요.");
+        return;
+      }
+      window.open(`https://blog.naver.com/${encodeURIComponent(blogId)}`, "_blank", "noopener,noreferrer");
     });
-    copyReferralBtn.addEventListener("click", showServicePreparingPopup);
+    copyReferralBtn.addEventListener("click", async () => {
+      const ok = await copyCode(ref.code);
+      copyReferralBtn.textContent = ok ? "✅ 복사됨!" : "❗ 복사 실패";
+      setTimeout(() => { copyReferralBtn.textContent = "📋 초대코드 복사"; }, 1300);
+    });
   }
 
   function createNavItem(svgHtml, label) {
@@ -2157,7 +1648,6 @@
     installBlogCaptureHooks();
     createUI();
     startPublishObserver();
-    hydrateSetupCache().catch(() => {});
   }
 
   if (document.readyState === "loading") {

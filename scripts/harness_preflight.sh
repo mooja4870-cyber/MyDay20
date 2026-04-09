@@ -19,6 +19,26 @@ if ! command -v adb >/dev/null 2>&1; then
   exit 1
 fi
 
+if ! command -v curl >/dev/null 2>&1; then
+  echo "[ERROR] curl not found"
+  exit 1
+fi
+
+if ! command -v node >/dev/null 2>&1; then
+  echo "[ERROR] node not found"
+  exit 1
+fi
+
+if ! command -v npx >/dev/null 2>&1; then
+  echo "[ERROR] npx not found"
+  exit 1
+fi
+
+if [[ ! -d "$ROOT_DIR/../ilsang_mooja" ]]; then
+  echo "[ERROR] backend repo ../ilsang_mooja is missing"
+  exit 1
+fi
+
 BUILD_TOOLS_DIR="${BUILD_TOOLS_DIR:-$HOME/Library/Android/sdk/build-tools/36.1.0}"
 for t in zipalign apksigner; do
   if [[ ! -x "$BUILD_TOOLS_DIR/$t" ]]; then

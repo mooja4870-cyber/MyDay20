@@ -1,17 +1,17 @@
 # PROJECT_STATUS
 
-- Last Updated: 2026-04-09 13:48:00
+- Last Updated: 2026-04-09 13:56:00
 - Policy: 작업 시작 전 이 파일을 먼저 확인하고, 없으면 생성 후 유지
 - Harness Mode: ENABLED
 - Deploy Rule: 코드 수정 후 `빌드 -> 푸시 -> 설치 -> 실행` 필수
 - Status Rule: 코드 변경/기능 추가/수정/삭제 후 반드시 이 파일 갱신 (필수)
 
 ## Current Target
-- App Label: `MyDay\n2.15`
+- App Label: `MyDay\n2.16`
 - App Id: `com.mooja.myday20`
 - Android Package: `com.mooja.myday20`
 - Launch Component: `com.mooja.myday20/com.mooja.autopost.MainActivity`
-- Current Version: 2.15
+- Current Version: 2.16
 
 ## Structure
 - `app/` : Android(smali/apktool) project
@@ -43,6 +43,7 @@
 | 2026-04-09 | 2.14 | 네이버 계정 전환 발행 안정화: 계정 fingerprint/version/sessionKey를 `/api/publish`·`/api/publish-async` 요청에 추가하고 `no-cache`/`forceFreshLogin`/`resetSession`/`clearCookies`/`clearStorage` 신호를 함께 보내 세션 재사용 누적을 최소화 |
 | 2026-04-09 | 2.15 | 모바일 백엔드 복구 강화: `HTTP`·`localhost`·사설 IP 백엔드 주소를 모바일에서 자동으로 Railway HTTPS로 정규화하고, 생성/발행 네트워크 오류 시 production 주소로 1회 자동 복구 재시도 |
 | 2026-04-09 | 2.15 | 네트워크 오류 안내 정정: 모바일 앱에서는 웹 브라우저용 mixed-content 안내 대신 백엔드 주소 점검/HTTPS 사용 가이드를 직접 표시 |
+| 2026-04-09 | 2.16 | 포스팅 `Network Error` 원인 수정: `/api/publish` preflight에서 서버가 허용하지 않는 `X-MyDay-*`/cache 헤더를 제거하고 계정 분리 신호는 request body에만 유지해 CORS 차단 재발 방지 |
 
 ## Next Rule
 - 코드 수정 후 이 파일의 `Last Updated`와 `Change Log`를 갱신

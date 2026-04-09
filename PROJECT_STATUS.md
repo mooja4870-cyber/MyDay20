@@ -1,17 +1,17 @@
 # PROJECT_STATUS
 
-- Last Updated: 2026-04-09 12:07:38
+- Last Updated: 2026-04-09 12:09:50
 - Policy: 작업 시작 전 이 파일을 먼저 확인하고, 없으면 생성 후 유지
 - Harness Mode: ENABLED
 - Deploy Rule: 코드 수정 후 `빌드 -> 푸시 -> 설치 -> 실행` 필수
 - Status Rule: 코드 변경/기능 추가/수정/삭제 후 반드시 이 파일 갱신 (필수)
 
 ## Current Target
-- App Label: `MyDay\n2.13`
+- App Label: `MyDay\n2.14`
 - App Id: `com.mooja.myday20`
 - Android Package: `com.mooja.myday20`
 - Launch Component: `com.mooja.myday20/com.mooja.autopost.MainActivity`
-- Current Version: 2.13
+- Current Version: 2.14
 
 ## Structure
 - `app/` : Android(smali/apktool) project
@@ -38,6 +38,7 @@
 | 2026-04-09 | 2.11 | 확장구간 임시 비노출: 공유초대·포스팅기록 클릭 시 준비중 팝업만 표시, 빠른도움은 기존 유지 |
 | 2026-04-09 | 2.12 | 빠른도움 정리: 초대코드 복사도 준비중 팝업으로 전환, 내 블로그 열기는 저장값/최근 발행/기록/화면 URL fallback으로 연결 복구 |
 | 2026-04-09 | 2.13 | 챗봇 가독성 조정: 빠른도움 챗봇 관련 모든 표시 텍스트를 기존 대비 133% 크기로 확대 |
+| 2026-04-09 | 2.14 | 빠른도움 상단 정리: RAG FAQ 배지와 안내문 블록 제거, 챗봇 리스트부터 바로 표시 |
 
 ## Next Rule
 - 코드 수정 후 이 파일의 `Last Updated`와 `Change Log`를 갱신

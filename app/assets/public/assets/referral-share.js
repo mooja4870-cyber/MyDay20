@@ -1551,12 +1551,6 @@
     const helpBody = document.createElement("div");
     helpBody.className = "myday-share-modal-body";
 
-    const ragIntro = document.createElement("div");
-    ragIntro.className = "myday-rag-intro";
-    ragIntro.innerHTML = `
-      <div class="myday-rag-badge">RAG FAQ · ${RAG_META.intentCount} Intent · ${RAG_META.questionCount}Q</div>
-      <div class="myday-share-hint">질문 표현이 달라도 자동으로 가장 가까운 의도를 찾아 답해요.</div>`;
-
     const ragQuick = document.createElement("div");
     ragQuick.className = "myday-rag-quick";
     const ragQuickQuestions = [
@@ -1604,7 +1598,6 @@
     helpHint.textContent = "앱과 무관한 질문은 답변하지 않아요.";
     helpActions.appendChild(helpHint);
 
-    helpBody.appendChild(ragIntro);
     helpBody.appendChild(ragQuick);
     helpBody.appendChild(ragChat);
     helpBody.appendChild(ragInputWrap);

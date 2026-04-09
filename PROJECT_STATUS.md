@@ -1,17 +1,17 @@
 # PROJECT_STATUS
 
-- Last Updated: 2026-04-09 13:59:47
+- Last Updated: 2026-04-09 14:18:21
 - Policy: 작업 시작 전 이 파일을 먼저 확인하고, 없으면 생성 후 유지
 - Harness Mode: ENABLED
 - Deploy Rule: 코드 수정 후 `빌드 -> 푸시 -> 설치 -> 실행` 필수
 - Status Rule: 코드 변경/기능 추가/수정/삭제 후 반드시 이 파일 갱신 (필수)
 
 ## Current Target
-- App Label: `MyDay\n2.17`
+- App Label: `MyDay\n2.18`
 - App Id: `com.mooja.myday20`
 - Android Package: `com.mooja.myday20`
 - Launch Component: `com.mooja.myday20/com.mooja.autopost.MainActivity`
-- Current Version: 2.17
+- Current Version: 2.18
 
 ## Structure
 - `app/` : Android(smali/apktool) project
@@ -46,6 +46,8 @@
 | 2026-04-09 | 2.16 | 포스팅 `Network Error` 원인 수정: `/api/publish` preflight에서 서버가 허용하지 않는 `X-MyDay-*`/cache 헤더를 제거하고 계정 분리 신호는 request body에만 유지해 CORS 차단 재발 방지 |
 | 2026-04-09 | 2.17 | 포스팅 비동기 큐 전환: 메인 발행/미리보기 발행 모두 `/api/publish-async`만 사용하도록 변경하고 `jobId` 기반 `publish-status` 폴링에 연결해 `timeout of 180000ms exceeded` 재발 경로를 차단 |
 | 2026-04-09 | 2.17 | 타임아웃 오인 팝업 보정: Axios timeout(`ECONNABORTED`/`ETIMEDOUT`)은 mixed-content/네트워크 차단 팝업으로 오인하지 않도록 분기해 잘못된 안내 재노출을 방지 |
+| 2026-04-09 | 2.18 | 중복 발행 잠금 도입: 이전 포스팅이 `queued`/`working` 상태이면 같은 계정의 새 발행을 차단하고 안내문으로 대기 유도해 로그인·세션 준비 실패 재발 경로를 차단 |
+| 2026-04-09 | 2.18 | 발행 상태 복구 강화: 활성 `jobId`와 상태를 로컬에 저장해 앱 재실행 후에도 기존 대기 작업을 복원하고 완료/실패 시 잠금을 자동 해제 |
 
 ## Next Rule
 - 코드 수정 후 이 파일의 `Last Updated`와 `Change Log`를 갱신

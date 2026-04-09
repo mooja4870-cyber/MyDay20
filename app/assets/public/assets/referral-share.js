@@ -50,6 +50,14 @@
       return Array.isArray(raw) ? raw : [];
     } catch { return []; }
   }
+  function getLatestHistoryBlogUrl() {
+    const items = loadHistory();
+    for (const item of items) {
+      const url = String(item && item.blogUrl ? item.blogUrl : "").trim();
+      if (url) return url;
+    }
+    return "";
+  }
   function saveHistory(items) {
     localStorage.setItem(HISTORY_KEY, JSON.stringify(items));
   }
@@ -91,6 +99,17 @@
     const m = bodyText.match(/https?:\/\/blog\.naver\.com\/\S+/i);
     if (m && m[0]) return m[0].replace(/[),.;]+$/, "");
     return blogId ? `https://blog.naver.com/${blogId}` : "";
+  }
+  function resolveBlogUrl() {
+    const blogId = getBlogId();
+    const domUrl = findBlogUrlFromDom(blogId);
+    if (domUrl) return domUrl;
+    const recentUrl = String(lastPublishData && lastPublishData.blogUrl ? lastPublishData.blogUrl : "").trim();
+    if (recentUrl) return recentUrl;
+    const historyUrl = getLatestHistoryBlogUrl();
+    if (historyUrl) return historyUrl;
+    if (blogId) return `https://blog.naver.com/${encodeURIComponent(blogId)}`;
+    return "";
   }
   function findPostTitleFromDom() {
     const h1s = document.querySelectorAll("h1, h2, [class*='title']");
@@ -1871,18 +1890,14 @@
       item.btn.addEventListener("click", () => askRag(item.q));
     }
     openBlogBtn.addEventListener("click", () => {
-      const blogId = getBlogId();
-      if (!blogId) {
+      const blogUrl = resolveBlogUrl();
+      if (!blogUrl) {
         alert("블로그 아이디가 아직 설정되지 않았어요.");
         return;
       }
-      window.open(`https://blog.naver.com/${encodeURIComponent(blogId)}`, "_blank", "noopener,noreferrer");
+      window.open(blogUrl, "_blank", "noopener,noreferrer");
     });
-    copyReferralBtn.addEventListener("click", async () => {
-      const ok = await copyCode(ref.code);
-      copyReferralBtn.textContent = ok ? "✅ 복사됨!" : "❗ 복사 실패";
-      setTimeout(() => { copyReferralBtn.textContent = "📋 초대코드 복사"; }, 1300);
-    });
+    copyReferralBtn.addEventListener("click", showServicePreparingPopup);
   }
 
   function createNavItem(svgHtml, label) {

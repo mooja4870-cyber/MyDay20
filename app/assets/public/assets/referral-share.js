@@ -8,6 +8,7 @@
   const REFERRAL_KEY = "MYDAY20_REFERRAL_V1";
   const SETUP_KEY = "MYDAY20_SETUP_V1";
   const HISTORY_KEY = "MYDAY20_POST_HISTORY_V1";
+  const RECENT_POSTS_KEY = "MYDAY20_RECENT_POSTS_V1";
   const HISTORY_LIMIT = 20;
   const CARD_W = 1080;
   const CARD_H = 1350;
@@ -38,22 +39,202 @@
     saveReferral(ref);
     return ref;
   }
-  function getBlogId() {
+  let setupCache = null;
+  let setupHydrationPromise = null;
+  let lastResolvedBlogUrl = "";
+  function getSecurePrefsPlugin() {
     try {
-      const s = JSON.parse(localStorage.getItem(SETUP_KEY)) || {};
-      return (s.naverBlogId || "").trim();
-    } catch { return ""; }
+      const plugin = window.Capacitor?.Plugins?.SecurePrefs;
+      return plugin && typeof plugin.get === "function" ? plugin : null;
+    } catch { return null; }
+  }
+  async function readStoredString(key) {
+    const securePrefs = getSecurePrefsPlugin();
+    if (securePrefs) {
+      try {
+        const result = await securePrefs.get({ key });
+        if (result && typeof result.value === "string") {
+          try {
+            localStorage.setItem(key, result.value);
+          } catch {}
+          return result.value;
+        }
+      } catch {}
+    }
+    try {
+      return localStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  }
+  function parseJson(raw, fallback) {
+    try { return JSON.parse(raw); }
+    catch { return fallback; }
+  }
+  function isObject(value) {
+    return !!value && typeof value === "object" && !Array.isArray(value);
+  }
+  function normalizeBlogId(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return "";
+
+    const withProtocol = /^(?:m\.)?blog\.naver\.com\//i.test(raw) ? `https://${raw}` : raw;
+    try {
+      const parsedUrl = new URL(withProtocol);
+      if (/^(?:m\.)?blog\.naver\.com$/i.test(parsedUrl.hostname)) {
+        const queryBlogId = parsedUrl.searchParams.get("blogId");
+        if (queryBlogId) return decodeURIComponent(queryBlogId).trim();
+        const pathParts = parsedUrl.pathname.split("/").filter(Boolean);
+        const firstPart = pathParts[0] || "";
+        if (firstPart && !/^PostView\.naver$/i.test(firstPart)) {
+          return decodeURIComponent(firstPart).trim();
+        }
+      }
+    } catch {}
+
+    return raw
+      .replace(/^@/, "")
+      .replace(/[?#].*$/, "")
+      .replace(/\/.*$/, "")
+      .trim();
+  }
+  function buildBlogHomeUrl(blogId) {
+    const normalized = normalizeBlogId(blogId);
+    return normalized ? `https://blog.naver.com/${encodeURIComponent(normalized)}` : "";
+  }
+  function normalizeBlogUrl(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return "";
+
+    const shortMatch = raw.match(/^https?:\/\/naver\.me\/[^\s"'<>]+/i);
+    if (shortMatch && shortMatch[0]) {
+      return shortMatch[0].replace(/[),.;]+$/, "");
+    }
+
+    const withProtocol = /^(?:m\.)?blog\.naver\.com\//i.test(raw) ? `https://${raw}` : raw;
+    const directMatch = withProtocol.match(/^https?:\/\/(?:m\.)?blog\.naver\.com\/[^\s"'<>]+/i);
+    if (directMatch && directMatch[0]) {
+      return directMatch[0].replace(/[),.;]+$/, "");
+    }
+
+    return buildBlogHomeUrl(raw);
+  }
+  function mergeSetupData(primary, secondary) {
+    const base = isObject(primary) ? primary : {};
+    const extra = isObject(secondary) ? secondary : {};
+    return { ...base, ...extra };
+  }
+  function readSetupFromLocal() {
+    const parsed = parseJson(localStorage.getItem(SETUP_KEY), {});
+    return isObject(parsed) ? parsed : {};
+  }
+  async function hydrateSetupCache(force) {
+    if (!force && setupHydrationPromise) return setupHydrationPromise;
+    if (!force && setupCache) return setupCache;
+
+    setupHydrationPromise = (async () => {
+      const localSetup = readSetupFromLocal();
+      const raw = await readStoredString(SETUP_KEY);
+      const storedSetup = isObject(parseJson(raw, {})) ? parseJson(raw, {}) : {};
+      setupCache = mergeSetupData(localSetup, storedSetup);
+      try {
+        localStorage.setItem(SETUP_KEY, JSON.stringify(setupCache));
+      } catch {}
+      return setupCache;
+    })();
+
+    try {
+      return await setupHydrationPromise;
+    } finally {
+      setupHydrationPromise = null;
+    }
+  }
+  function getSetupSnapshot() {
+    if (setupCache && isObject(setupCache)) return setupCache;
+    const localSetup = readSetupFromLocal();
+    setupCache = localSetup;
+    return localSetup;
+  }
+  function extractBlogIdFromSetup(setup) {
+    const source = isObject(setup) ? setup : {};
+    const candidates = [
+      source.naverBlogId,
+      source.blogId,
+      source.blog_id,
+      source.naverBlogUrl,
+      source.blogUrl,
+      source.blogURL,
+      source.blog,
+      source.url,
+    ];
+    for (const candidate of candidates) {
+      const normalized = normalizeBlogId(candidate);
+      if (normalized) return normalized;
+    }
+    return "";
+  }
+  function extractBlogUrlFromSetup(setup) {
+    const source = isObject(setup) ? setup : {};
+    const candidates = [
+      source.naverBlogUrl,
+      source.blogUrl,
+      source.blogURL,
+      source.url,
+    ];
+    for (const candidate of candidates) {
+      const normalized = normalizeBlogUrl(candidate);
+      if (normalized) return normalized;
+    }
+    return buildBlogHomeUrl(extractBlogIdFromSetup(source));
+  }
+  function rememberBlogUrl(url) {
+    const normalized = normalizeBlogUrl(url);
+    if (!normalized) return "";
+    lastResolvedBlogUrl = normalized;
+    if (lastPublishData) {
+      lastPublishData = { ...lastPublishData, blogUrl: normalized };
+    }
+    return normalized;
+  }
+  function getBlogId() {
+    return extractBlogIdFromSetup(getSetupSnapshot());
+  }
+  function parseHistoryItems(raw) {
+    if (!Array.isArray(raw)) return [];
+    return raw.map((item) => {
+      const row = isObject(item) ? item : {};
+      return {
+        ...row,
+        title: String(row.title || row.postTitle || "").trim() || "MyDay 포스팅",
+        blogUrl: normalizeBlogUrl(row.blogUrl || row.url || row.postUrl || row.link),
+        elapsed: Number(row.elapsed || row.durationSeconds || 0) || 0,
+        imgCount: Number(row.imgCount || row.imageCount || 0) || 0,
+        createdAt: String(row.createdAt || row.publishedAt || row.updatedAt || "").trim(),
+      };
+    }).filter((item) => item.blogUrl || item.createdAt || item.title);
   }
   function loadHistory() {
-    try {
-      const raw = JSON.parse(localStorage.getItem(HISTORY_KEY)) || [];
-      return Array.isArray(raw) ? raw : [];
-    } catch { return []; }
+    const merged = [];
+    const seen = new Set();
+    for (const key of [HISTORY_KEY, RECENT_POSTS_KEY]) {
+      const items = parseHistoryItems(parseJson(localStorage.getItem(key), []));
+      for (const item of items) {
+        const dedupeKey = `${item.title}|${item.blogUrl}|${item.createdAt}`;
+        if (seen.has(dedupeKey)) continue;
+        seen.add(dedupeKey);
+        merged.push(item);
+      }
+    }
+    return merged.sort((a, b) => {
+      const aTime = Date.parse(a.createdAt || "") || 0;
+      const bTime = Date.parse(b.createdAt || "") || 0;
+      return bTime - aTime;
+    });
   }
   function getLatestHistoryBlogUrl() {
     const items = loadHistory();
     for (const item of items) {
-      const url = String(item && item.blogUrl ? item.blogUrl : "").trim();
+      const url = normalizeBlogUrl(item && item.blogUrl ? item.blogUrl : "");
       if (url) return url;
     }
     return "";
@@ -90,25 +271,34 @@
     } catch { return ""; }
   }
   function findBlogUrlFromDom(blogId) {
-    const anchors = document.querySelectorAll('a[href*="blog.naver.com"]');
+    const anchors = document.querySelectorAll('a[href*="blog.naver.com"], a[href*="naver.me"]');
     for (const a of anchors) {
-      const href = (a.getAttribute("href") || "").trim();
-      if (/^https?:\/\/blog\.naver\.com\/\S+/i.test(href)) return href;
+      const text = String(a.textContent || "").trim();
+      const href = normalizeBlogUrl(a.href || a.getAttribute("href") || "");
+      if (text.includes("보러가기") && href) return href;
+    }
+    for (const a of anchors) {
+      const href = normalizeBlogUrl(a.href || a.getAttribute("href") || "");
+      if (href) return href;
     }
     const bodyText = document.body.innerText || "";
-    const m = bodyText.match(/https?:\/\/blog\.naver\.com\/\S+/i);
-    if (m && m[0]) return m[0].replace(/[),.;]+$/, "");
-    return blogId ? `https://blog.naver.com/${blogId}` : "";
+    const m = bodyText.match(/https?:\/\/(?:m\.)?blog\.naver\.com\/\S+/i);
+    if (m && m[0]) return normalizeBlogUrl(m[0]);
+    return buildBlogHomeUrl(blogId);
   }
-  function resolveBlogUrl() {
+  async function resolveBlogUrl() {
+    await hydrateSetupCache(true);
     const blogId = getBlogId();
+    const setupUrl = extractBlogUrlFromSetup(getSetupSnapshot());
     const domUrl = findBlogUrlFromDom(blogId);
-    if (domUrl) return domUrl;
-    const recentUrl = String(lastPublishData && lastPublishData.blogUrl ? lastPublishData.blogUrl : "").trim();
-    if (recentUrl) return recentUrl;
+    if (domUrl) return rememberBlogUrl(domUrl);
+    if (setupUrl) return rememberBlogUrl(setupUrl);
+    const recentUrl = normalizeBlogUrl(lastPublishData && lastPublishData.blogUrl ? lastPublishData.blogUrl : "");
+    if (recentUrl) return rememberBlogUrl(recentUrl);
+    if (lastResolvedBlogUrl) return lastResolvedBlogUrl;
     const historyUrl = getLatestHistoryBlogUrl();
-    if (historyUrl) return historyUrl;
-    if (blogId) return `https://blog.naver.com/${encodeURIComponent(blogId)}`;
+    if (historyUrl) return rememberBlogUrl(historyUrl);
+    if (blogId) return rememberBlogUrl(buildBlogHomeUrl(blogId));
     return "";
   }
   function findPostTitleFromDom() {
@@ -716,6 +906,24 @@
     if (!doc) return;
     lastGeneratedBlogDoc = { ...doc, source: "api" };
   }
+  function capturePublishResponse(url, responseText) {
+    if (!/\/api\/publish(?:-async)?/i.test(String(url || ""))) return;
+    const parsed = parseJson(responseText, null);
+    if (!isObject(parsed)) return;
+
+    const candidates = [
+      parsed.url,
+      parsed.blogUrl,
+      parsed.data && parsed.data.url,
+      parsed.data && parsed.data.blogUrl,
+    ];
+    for (const candidate of candidates) {
+      const normalized = normalizeBlogUrl(candidate);
+      if (!normalized) continue;
+      rememberBlogUrl(normalized);
+      return;
+    }
+  }
   function installBlogCaptureHooks() {
     if (blogCaptureHookInstalled) return;
     blogCaptureHookInstalled = true;
@@ -735,6 +943,9 @@
         this.addEventListener("load", () => {
           try {
             captureBlogFromPayload(this.__mydayUrl || "", this.responseText || "");
+          } catch {}
+          try {
+            capturePublishResponse(this.__mydayUrl || "", this.responseText || "");
           } catch {}
         });
         return originalSend.apply(this, args);
@@ -762,6 +973,11 @@
           if (/\/api\/generate-blog/i.test(url)) {
             res.clone().text().then((txt) => {
               captureBlogFromPayload(url, txt);
+            }).catch(() => {});
+          }
+          if (/\/api\/publish(?:-async)?/i.test(url)) {
+            res.clone().text().then((txt) => {
+              capturePublishResponse(url, txt);
             }).catch(() => {});
           }
         } catch {}
@@ -902,7 +1118,7 @@
         successLatched = true;
         const elapsed = publishStartTime ? Math.round((Date.now() - publishStartTime) / 1000) : 0;
         const blogId = getBlogId();
-        const blogUrl = findBlogUrlFromDom(blogId);
+        const blogUrl = rememberBlogUrl(findBlogUrlFromDom(blogId));
 
         /* Try to find image count from DOM */
         const imgEls = document.querySelectorAll('img[src^="data:image"]');
@@ -1883,12 +2099,15 @@
       item.btn.addEventListener("click", () => askRag(item.q));
     }
     openBlogBtn.addEventListener("click", () => {
-      const blogUrl = resolveBlogUrl();
-      if (!blogUrl) {
-        alert("블로그 아이디가 아직 설정되지 않았어요.");
-        return;
-      }
-      window.open(blogUrl, "_blank", "noopener,noreferrer");
+      resolveBlogUrl().then((blogUrl) => {
+        if (!blogUrl) {
+          alert("블로그 아이디가 아직 설정되지 않았어요.");
+          return;
+        }
+        window.open(blogUrl, "_blank", "noopener,noreferrer");
+      }).catch(() => {
+        alert("내 블로그 주소를 확인하는 중 문제가 발생했어요. 잠시 후 다시 시도해 주세요.");
+      });
     });
     copyReferralBtn.addEventListener("click", showServicePreparingPopup);
   }
@@ -1907,6 +2126,7 @@
     installBlogCaptureHooks();
     createUI();
     startPublishObserver();
+    hydrateSetupCache().catch(() => {});
   }
 
   if (document.readyState === "loading") {

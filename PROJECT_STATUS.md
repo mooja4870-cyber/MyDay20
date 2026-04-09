@@ -1,6 +1,6 @@
 # PROJECT_STATUS
 
-- Last Updated: 2026-04-09 12:09:50
+- Last Updated: 2026-04-09 13:15:00
 - Policy: 작업 시작 전 이 파일을 먼저 확인하고, 없으면 생성 후 유지
 - Harness Mode: ENABLED
 - Deploy Rule: 코드 수정 후 `빌드 -> 푸시 -> 설치 -> 실행` 필수
@@ -39,6 +39,8 @@
 | 2026-04-09 | 2.12 | 빠른도움 정리: 초대코드 복사도 준비중 팝업으로 전환, 내 블로그 열기는 저장값/최근 발행/기록/화면 URL fallback으로 연결 복구 |
 | 2026-04-09 | 2.13 | 챗봇 가독성 조정: 빠른도움 챗봇 관련 모든 표시 텍스트를 기존 대비 133% 크기로 확대 |
 | 2026-04-09 | 2.14 | 빠른도움 상단 정리: RAG FAQ 배지와 안내문 블록 제거, 챗봇 리스트부터 바로 표시 |
+| 2026-04-09 | 2.14 | 빠른도움 블로그 열기 복구 강화: SecurePrefs/localStorage 동기화, `m.blog.naver.com`/`naver.me`/최근 응답/기록 fallback까지 포함해 내 블로그 열기 신뢰성 보강 |
+| 2026-04-09 | 2.14 | 네이버 계정 전환 발행 안정화: 계정 fingerprint/version/sessionKey를 `/api/publish`·`/api/publish-async` 요청에 추가하고 `no-cache`/`forceFreshLogin`/`resetSession`/`clearCookies`/`clearStorage` 신호를 함께 보내 세션 재사용 누적을 최소화 |
 
 ## Next Rule
 - 코드 수정 후 이 파일의 `Last Updated`와 `Change Log`를 갱신

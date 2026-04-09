@@ -1,17 +1,17 @@
 # PROJECT_STATUS
 
-- Last Updated: 2026-04-09 15:37:14
+- Last Updated: 2026-04-09 15:48:24
 - Policy: 작업 시작 전 이 파일을 먼저 확인하고, 없으면 생성 후 유지
 - Harness Mode: ENABLED
 - Deploy Rule: 코드 수정 후 `빌드 -> 푸시 -> 설치 -> 실행` 필수
 - Status Rule: 코드 변경/기능 추가/수정/삭제 후 반드시 이 파일 갱신 (필수)
 
 ## Current Target
-- App Label: `MyDay\n2.20`
+- App Label: `MyDay\n2.21`
 - App Id: `com.mooja.myday20`
 - Android Package: `com.mooja.myday20`
 - Launch Component: `com.mooja.myday20/com.mooja.autopost.MainActivity`
-- Current Version: 2.20
+- Current Version: 2.21
 
 ## Structure
 - `app/` : Android(smali/apktool) project
@@ -51,6 +51,7 @@
 | 2026-04-09 | 2.19 | 버전 정렬 재배포: 동일 기능 기준 설치본/표시 버전을 `2.19`로 상향해 앱 표기와 배포 버전을 일치 |
 | 2026-04-09 | 2.20 | 서버 RAG 지식 확장: 버전 이력 청크 5개(v2.2~v2.19) + 기술 용어 청크 5개(비동기큐/CORS/하네스/RAG/중복발행잠금) 추가 |
 | 2026-04-09 | 2.20 | 계정별 세션 분리: browser_session_{username}.json으로 개별 관리, 타 계정 세션 혼용 방지, 자동 로그인 항상 시도 |
+| 2026-04-09 | 2.21 | 서버 RAG 앱 용어 사전 28개 + 버전 이력/기술 용어 청크 추가, 용어 질문 서버 RAG 직행 로직 적용 |
 
 ## Next Rule
 - 코드 수정 후 이 파일의 `Last Updated`와 `Change Log`를 갱신

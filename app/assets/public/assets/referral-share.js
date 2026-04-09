@@ -1540,7 +1540,7 @@
     const helpOverlay = document.createElement("div");
     helpOverlay.className = "myday-share-overlay";
     const helpModal = document.createElement("div");
-    helpModal.className = "myday-share-modal";
+    helpModal.className = "myday-share-modal myday-help-modal";
     const helpHeader = document.createElement("div");
     helpHeader.className = "myday-share-modal-header";
     helpHeader.innerHTML = "<h2>빠른 도움</h2>";
